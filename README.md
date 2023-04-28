@@ -1,5 +1,7 @@
 # (Descriptive) Data Analyses with Shiny & R
 
+Note that this app is in a very early stage.
+
 You need the following R packages:
 
 
