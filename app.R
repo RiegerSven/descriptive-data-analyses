@@ -17,7 +17,7 @@ ui <- fluidPage(
                       sidebarLayout(
                         sidebarPanel(
                           tryCatch(
-                            fileInput("file1", "Data File", 
+                            fileInput("file1", "Data File ( !not ready to use...:(! )", 
                                       accept=c(".csv"))
                           ),
                           helpText('Select a .csv file to be uploaded. The R function read.csv with the default settings for arguments.'),
@@ -30,6 +30,8 @@ ui <- fluidPage(
                                          options = list(placeholder = 'choose example data'),
                                          width='50%'),  
                           hr(),
+                          conditionalPanel(condition = "input.tabs == 0",
+                                           checkboxInput(inputId = "showDatInfo", "str(data)", FALSE)),
                           conditionalPanel(condition = "input.tabs == 1",
                                            varSelectInput(inputId = "vars", label = "Variables (required)",
                                                           character(0),
@@ -109,7 +111,9 @@ ui <- fluidPage(
                         mainPanel(
                           tabsetPanel(id = "tabs",
                                       tabPanel("Data", value = 0,
-                                               DT::dataTableOutput("tbl")),  
+                                               DT::dataTableOutput("tbl"),
+                                               hr(),
+                                               verbatimTextOutput(outputId = "showDatInfo")),  
                                       tabPanel("Descriptive statistics", value = 1,
                                                verbatimTextOutput(outputId = "descr"),
                                                hr(),
@@ -203,9 +207,9 @@ server <- function(input, output) {
     tempDescr <- data.table::rbindlist(
       lapply( 1:length(as.character(input$vars)),
               function(x) {
-                if ( is.numeric( dataInput()[,as.character(input$vars)[x]]) == FALSE ) {
-                  stop("Variable must be of type numeric to calculate descriptive statistics.")
-                }
+                if ( is.numeric( dataInput()[,as.character(input$vars)[x]]) == TRUE |
+                     is.integer( dataInput()[,as.character(input$vars)[x]]) == TRUE ) {
+                  
                 mean <- mean(dataInput()[,as.character(input$vars)[x]], na.rm = T)
                 median <- stats::median(dataInput()[,as.character(input$vars)[x]], na.rm = T)
                 mode <- Mode(dataInput()[,as.character(input$vars)[x]])
@@ -218,7 +222,10 @@ server <- function(input, output) {
                 dat <- data.frame(Mean = mean, Median = median, Mode = mode,
                                   SD = sd, Var = var,
                                   Min = min, Max = max, Skew = skew, Kurtosis = kurt)
-                dat <- round(dat, 3)
+                dat <- round(dat, 3) } else {
+                  stop("Variable must be of type numeric to calculate descriptive statistics.")
+                }
+                
                 return(dat)
               }), 
       idcol = "Variable")
@@ -496,7 +503,7 @@ server <- function(input, output) {
         
         sc2 <- sc2 + geom_smooth(method = "loess", formula = 'y ~ x',
                                  se = FALSE, color = "darkred")
-      sc2
+        sc2
       
     }
       
@@ -509,6 +516,17 @@ server <- function(input, output) {
     
     DT::datatable(dataInput(), options = list(lengthChange = FALSE))
       
+  })
+  
+  output$showDatInfo = renderPrint({
+    
+    if (input$showDatInfo == TRUE) {
+      
+      str(dataInput())
+      
+    }
+    
+    
   })
   
   
