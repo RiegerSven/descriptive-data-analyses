@@ -8,8 +8,9 @@
 #
 
 library(shiny)
+library(ggplot2)
 
-ui <- ui <- fluidPage(
+ui <- fluidPage(
   titlePanel(""),
   navbarPage("(Descriptive) Data Analyses with Shiny & R",
              tabPanel("Analyses",
@@ -47,7 +48,10 @@ ui <- ui <- fluidPage(
                                            checkboxInput(inputId = "max", "Maximum", FALSE)),
                                            column(4, HTML("<b>Measures of <br> shape</b>"),
                                            checkboxInput(inputId = "skew", "Skewness", FALSE),
-                                           checkboxInput(inputId = "kurt", "Kurtosis", FALSE)))),
+                                           checkboxInput(inputId = "kurt", "Kurtosis", FALSE))),
+                                           hr(),
+                                           checkboxInput(inputId = "hist", "Density plots?", FALSE),
+                                           uiOutput("histPlot")),
                           conditionalPanel(condition = "input.tabs == 2",
                                            fluidRow(
                                              column(6,
@@ -76,6 +80,7 @@ ui <- ui <- fluidPage(
                                                                  value = 0.95, min = 0.001, max = .999, step = 0.01#,
                                                                  #width = '30%'
                                                                  ))),
+                                           hr(),
                                            checkboxInput(inputId = "scatterPlot1", "Scatterplot", FALSE),
                                            uiOutput("smooth1")),
                           conditionalPanel(condition = "input.tabs == 3",
@@ -96,6 +101,7 @@ ui <- ui <- fluidPage(
                                                                    character(0),
                                                                    selected = NULL,
                                                                    multiple = TRUE))),
+                                           hr(),
                                            checkboxInput(inputId = "scatterPlot2", "Scatterplot", FALSE),
                                            uiOutput("smooth2"))
                         ),
@@ -105,12 +111,14 @@ ui <- ui <- fluidPage(
                                       tabPanel("Data", value = 0,
                                                DT::dataTableOutput("tbl")),  
                                       tabPanel("Descriptive statistics", value = 1,
-                                               verbatimTextOutput(outputId = "descr"), style='width: 75%'),
+                                               verbatimTextOutput(outputId = "descr"),
+                                               hr(),
+                                               plotOutput(outputId = "hist"), style='width: 75%'),
                                       tabPanel("Correlation", value = 2,
                                                verbatimTextOutput(outputId = "cor"),
                                                hr(),
                                                plotOutput(outputId = "scatter1"), style='width: 65%'),
-                                      tabPanel("Linear Regression", value = 3,
+                                      tabPanel("Regression Modeling", value = 3,
                                                verbatimTextOutput(outputId = "regOutput"),
                                                hr(),
                                                plotOutput(outputId = "scatter2"), style='width: 65%')
@@ -129,10 +137,9 @@ ui <- ui <- fluidPage(
 
 
 
-# Define server logic required to draw a histogram
 server <- function(input, output) {
   
-  ######## Reactive Data Input ########
+  # Reactive Data Input ####
   dataInput <- reactive({
     inFile <- input$file1
     exdata <- input$exdata
@@ -158,7 +165,7 @@ server <- function(input, output) {
     
     
   })
-  
+  # Update Select Input ####
   observeEvent(dataInput(), {
     updateSelectInput(session = getDefaultReactiveDomain(), "vars", choices = colnames(dataInput()))
   })
@@ -184,7 +191,7 @@ server <- function(input, output) {
   })
   
   
-  
+  # Calculate Descriptive Statistics ####
   
   calcDescr <- reactive({
     # https://stackoverflow.com/questions/2547402/how-to-find-the-statistical-mode/8189441#8189441
@@ -196,16 +203,18 @@ server <- function(input, output) {
     tempDescr <- data.table::rbindlist(
       lapply( 1:length(as.character(input$vars)),
               function(x) {
-                
-                mean <- mean(data[,as.character(input$vars)[x]], na.rm = T)
-                median <- stats::median(data[,as.character(input$vars)[x]], na.rm = T)
-                mode <- Mode(data[,as.character(input$vars)[x]])
-                sd <- sd(data[,as.character(input$vars)[x]], na.rm = T)
-                var <- var(data[,as.character(input$vars)[x]], na.rm = T)
-                min <- min(data[,as.character(input$vars)[x]], na.rm = T)
-                max <- max(data[,as.character(input$vars)[x]], na.rm = T)
-                skew <- moments::skewness(data[,as.character(input$vars)[x]], na.rm = T)
-                kurt <- moments::kurtosis(data[,as.character(input$vars)[x]], na.rm = T)
+                if ( is.numeric( dataInput()[,as.character(input$vars)[x]]) == FALSE ) {
+                  stop("Variable must be of type numeric to calculate descriptive statistics.")
+                }
+                mean <- mean(dataInput()[,as.character(input$vars)[x]], na.rm = T)
+                median <- stats::median(dataInput()[,as.character(input$vars)[x]], na.rm = T)
+                mode <- Mode(dataInput()[,as.character(input$vars)[x]])
+                sd <- sd(dataInput()[,as.character(input$vars)[x]], na.rm = T)
+                var <- var(dataInput()[,as.character(input$vars)[x]], na.rm = T)
+                min <- min(dataInput()[,as.character(input$vars)[x]], na.rm = T)
+                max <- max(dataInput()[,as.character(input$vars)[x]], na.rm = T)
+                skew <- moments::skewness(dataInput()[,as.character(input$vars)[x]], na.rm = T)
+                kurt <- moments::kurtosis(dataInput()[,as.character(input$vars)[x]], na.rm = T)
                 dat <- data.frame(Mean = mean, Median = median, Mode = mode,
                                   SD = sd, Var = var,
                                   Min = min, Max = max, Skew = skew, Kurtosis = kurt)
@@ -225,7 +234,7 @@ server <- function(input, output) {
     
     if ( length(as.character(input$vars)) == 0 ) {
       
-      cat( "please select variables") 
+      HTML( "Please select variables") 
       
     } else {
     
@@ -248,6 +257,63 @@ server <- function(input, output) {
     
   })
   
+  
+  
+  output$hist <- renderPlot({ 
+    
+    histPlot <- function( data,
+                          item,
+                          title = "",
+                          xLab = "",
+                          yLab = "Density",
+                          facetNcol = 3) {
+      
+      #data <- data.table::as.data.table(data)
+      if (length(item) > 1) {
+        
+        data <- reshape(data[,item],
+                        varying = item,
+                        v.names = "val",
+                        timevar = "item",
+                        times = item,
+                        direction = "long")
+        
+      } else {
+        data$val <- data[,item]
+        data$item <- ""
+      }
+      
+      tempPlot <- ggplot(data = data,
+                         aes( x = val)) +
+        geom_histogram(aes(y=..density..),
+                       fill = "lightgrey", color = "black", bins = 30) +
+        geom_density(aes(y=..density..), fill = "lightblue", alpha = .5) +
+        facet_wrap(~item, scales = "free", ncol = facetNcol) +
+        labs(x = xLab, y = yLab) +
+        theme_minimal() +
+        theme(axis.text = element_text(size = 15),
+              axis.title = element_text(size = 15),
+              plot.title = element_text(size = 25, hjust = 0.5),
+              strip.text.x = element_text(size = 20))
+      
+      return(tempPlot)
+      
+    }
+    
+    if ( input$hist == TRUE) {
+    
+      if ( length(as.character(input$vars)) == 0) {
+        stop("You need to select variables.")
+      }
+      
+    tempHist <- histPlot(data = dataInput(),
+                         item = as.character(input$vars))
+    tempHist
+    }
+      
+
+    })
+  
   calcCorr <- reactive({
     
     cor.test(x = dataInput()[,as.character(input$varX)],
@@ -262,7 +328,7 @@ server <- function(input, output) {
     
     if ( length(input$varY) == 0 |  length(input$varX) == 0) {
       
-      cat( "please select variables") 
+      HTML( "Please select variables") 
       
     } else {
       
@@ -322,7 +388,7 @@ server <- function(input, output) {
     
     if ( length(input$varY2) == 0 |  length(input$varX2) == 0) {
       
-      cat( "please select variables") 
+      HTML( "Please select variables") 
       
     } else {
       
@@ -378,7 +444,7 @@ server <- function(input, output) {
       
     sc1 <- ggplot(data = dataInput(),
            aes(y = .data[[input$varY]], x = .data[[input$varX]])) +
-      geom_point(color = "black", fill = "white", size = 3, alpha = .25) +
+      geom_point(color = "black", fill = "white", linewidth = 3, alpha = .25) +
       labs(x = input$labX, y = input$labY, title = input$title) +
       #geom_hline(yintercept = yMean, color = "black") +
       #geom_vline(yintercept = xMean, color = "black") +
@@ -395,7 +461,7 @@ server <- function(input, output) {
     
     sc1 <- sc1 + geom_smooth(method = "loess", formula = 'y ~ x',
                              se = FALSE, color = "darkred",
-                             size = 2)
+                             linewidth = 2)
     sc1
     
     }

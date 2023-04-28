@@ -2,7 +2,7 @@
 
 Note that this app is in a very early stage.
 
-You need the following R packages:
+You need the following R packages (hopefully i did not forget one):
 
 
 ```
