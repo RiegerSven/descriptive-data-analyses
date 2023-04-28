@@ -6,14 +6,13 @@ You need the following R packages:
 
 
 ```
-pkgList <- list("shiny", "data.table", "DT", "survey")
+pkgList <- list("shiny", "data.table", "DT", "survey", "ggplot2")
 ```
 
 ```{r}
 lapply(pkgList,
        function(x) 
          if(!x %in% rownames(installed.packages())) install.packages(x))
-
 ```
 
 
