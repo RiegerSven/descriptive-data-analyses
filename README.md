@@ -15,14 +15,11 @@ pkgList <- list("shiny",
                 "moments",
                 "ggplot2",
                 "rmarkdown")
-```
-
-```{r}
+                
 lapply(pkgList,
        function(x) 
          if(!x %in% rownames(installed.packages())) install.packages(x))
 ```
-
 
 You can use the app with the following code:
 
