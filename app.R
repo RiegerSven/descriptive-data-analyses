@@ -40,14 +40,15 @@ ui <- fluidPage(
                                            br(),
                                            selectizeInput(inputId="exdata", label="Example Data", selected="",
                                                           choices= c("",
-                                                                     "no data",
                                                                      "Diamonds (ggplot2 package)",
                                                                      "Holzinger1939 (lavaan package)",
-                                                                     "Highschool and beyond (merTools package)"),
+                                                                     "Highschool and beyond (merTools package)",
+                                                                     "Now, I want to upload data!"),
                                                           options = list(placeholder = 'choose example data'),
                                                           width='50%'),
                                            hr(),
-                                           checkboxInput(inputId = "showDatInfo", "Show information about the data set: str(data)", FALSE)),
+                                           checkboxInput(inputId = "showDatInfo", "Show information about the data set: str(data)", FALSE)
+                                           ),
                           conditionalPanel(condition = "input.tabs == 1",
                                            varSelectInput(inputId = "vars", label = "Variables (required)",
                                                           character(0),
@@ -201,29 +202,33 @@ server <- function(input, output) {
     
       if (is.null(input$file1$datapath)) {
         
-        if(input$exdata==""){
-          return(NULL) 
-          } else if(input$exdata=="Diamonds (ggplot2 package)"){
+        if(input$exdata == ""){
+          return(NULL)
+          } else if(input$exdata == "Now, I want to upload data!"){
+            return(NULL)
+            } else if(input$exdata == "Diamonds (ggplot2 package)"){
             dat <- ggplot2::diamonds
             return(dat)
-        } else if(input$exdata=="Holzinger1939 (lavaan package)"){
-          dat <- lavaan::HolzingerSwineford1939
-          return(dat)  
-        } else if(input$exdata == "Highschool and beyond (merTools package)"){
-          dat <- merTools::hsb
-          return(dat)
-        }
+            } else if(input$exdata == "Holzinger1939 (lavaan package)"){
+              dat <- lavaan::HolzingerSwineford1939
+              return(dat)
+              } else if(input$exdata == "Highschool and beyond (merTools package)"){
+                dat <- merTools::hsb
+                return(dat)
+                }
         
         
       } else {
+       
         
-      
-      dat <- tryCatch(data.table::data.table ( read.csv(input$file1$datapath,
+        
+        dat <- tryCatch(data.table::data.table ( read.csv(input$file1$datapath,
                                                header = input$header,
                                                sep = input$sep,
                                                quote = input$quote,
                                                dec = input$dec) 
                                       ))
+        updateSelectInput(session = getDefaultReactiveDomain(), "exdata", choices = "You uploaded data.") 
       
       return(dat)
       }
@@ -231,6 +236,7 @@ server <- function(input, output) {
   
   
   # Update Select Input ####
+  
   observeEvent(dataInput(), {
     updateSelectInput(session = getDefaultReactiveDomain(), "vars", choices = colnames(dataInput()))
   })
@@ -306,6 +312,12 @@ server <- function(input, output) {
   
   output$descr <- renderPrint({
     
+    if ( is.null(dataInput())) {
+      
+      HTML( "Please upload or choose an example data set.") 
+      
+    } else {
+    
     if ( length(as.character(input$vars)) == 0 ) {
       
       HTML( "Please select variables") 
@@ -327,6 +339,7 @@ server <- function(input, output) {
         
     calcDescr()[,..selDescr]
      
+    }
     }
     
   })
@@ -398,6 +411,12 @@ server <- function(input, output) {
   
   output$cor <- renderPrint({
     
+    if ( is.null(dataInput())) {
+      
+      HTML( "Please upload or choose an example data set.") 
+      
+    } else {
+    
     if ( length(input$varY) == 0 |  length(input$varX) == 0) {
       
       HTML( "Please select variables") 
@@ -406,6 +425,7 @@ server <- function(input, output) {
       
       calcCorr()
       
+    }
     }
     
   })
@@ -426,21 +446,30 @@ server <- function(input, output) {
   
   output$tTest <- renderPrint({
     
-    if ( length(input$varY2) == 0 |  length(input$varX2) == 0) {
+    if ( is.null(dataInput())) {
       
-      HTML( "Please select variables") 
+      HTML( "Please upload or choose an example data set.") 
       
     } else {
       
-      calctTest()
+      if ( length(input$varY2) == 0 |  length(input$varX2) == 0) {
+        
+        HTML( "Please select variables") 
+        
+      } else {
+        
+        calctTest()
+        
+      }
+      
       
     }
     
+    
+    
   })
-  
+  # Calculate Regression ####
   calcReg <- reactive({
-    
-    
     
     if ( length(as.character(input$cluster)) > 1) {
       stop("only one cluster is supported")
@@ -486,17 +515,23 @@ server <- function(input, output) {
   
   output$regOutput <- renderPrint({
     
-    if ( length(input$varYreg) == 0 |  length(input$varsX) == 0) {
+    if ( is.null(dataInput())) {
       
-      HTML( "Please select variables") 
+      HTML( "Please upload or choose an example data set.") 
       
     } else {
       
-      calcReg()
+      if ( length(input$varYreg) == 0 |  length(input$varsX) == 0) {
       
-    }
-    
-  })
+      HTML( "Please select variables") 
+        
+        } else {
+          
+          calcReg()
+          
+        }
+      }
+    })
   
   output$smooth1 = renderUI({
     
@@ -538,6 +573,10 @@ server <- function(input, output) {
   output$scatter1 <- renderPlot({
     
     if ( input$scatterPlot1 == TRUE ) {
+      
+      if ( length(as.character(input$varY)) == 0 | length(as.character(input$varX)) == 0) {
+        stop("You need to select variables.")
+      }
     
       #yMean <- mean(dataInput()[,as.character(input$varY)], na.rm = T)
       #xMean <- mean(dataInput()[,as.character(input$varX)], na.rm = T)
@@ -573,6 +612,10 @@ server <- function(input, output) {
     
     if ( input$scatterPlot2 == TRUE ) {
       
+      if ( length(as.character(input$varYreg)) == 0 | length(as.character(input$varsX)) == 0) {
+        stop("You need to select variables.")
+      }
+      
       if ( length(input$varX2) > 1 ) {
         stop("visualizing is only available for 2 variables in total")
       }
@@ -605,6 +648,10 @@ server <- function(input, output) {
   output$boxplot <- renderPlot({
       
     if ( input$boxplot == TRUE ) {
+      
+      if ( length(as.character(input$varY2)) == 0 | length(as.character(input$varX2)) == 0) {
+        stop("You need to select variables.")
+      }
     
       tempBox <- ggplot(data = dataInput(),
                     aes(y = .data[[input$varY2]],
@@ -663,6 +710,8 @@ server <- function(input, output) {
     
     
   })
+  
+
   
   
 }
