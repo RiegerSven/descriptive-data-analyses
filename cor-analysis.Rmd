@@ -6,6 +6,12 @@ params:
   data: NA
   varX: NA
   varY: NA
+  smooth1: NA
+  labX: NA
+  labY: NA
+  title: NA
+  sc1AxisTextSize: NA
+  sc1TitleTextSize: NA
 ---
 
 
@@ -24,3 +30,28 @@ cor.test(x = dat[,paste0(params$varX)],
 
 
 ```
+
+
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+sc1 <- ggplot(data = dat,
+           aes(y = .data[[paste0(params$varY)]], x = .data[[paste0(params$varX)]])) +
+      geom_point(color = "black", fill = "white", linewidth = 2, alpha = .25) +
+      labs(x = params$labX, y = params$labY, title = params$title) +
+      theme_minimal() + theme(axis.text = element_text(size = params$sc1AxisTextSize),
+                              axis.title = element_text(size = params$sc1AxisTextSize),
+                              plot.title = element_text(size = 25, hjust = 0.5))
+    
+if ( params$smooth1 == FALSE ) {
+      
+      sc1
+      
+      
+    } else {
+    
+    sc1 <- sc1 + geom_smooth(method = "loess", formula = 'y ~ x',
+                             se = FALSE, color = "darkred",
+                             linewidth = 1.5)
+    sc1
+    } 
+```
+

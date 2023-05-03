@@ -153,7 +153,46 @@ ui <- fluidPage(
                                                                    multiple = TRUE))),
                                            hr(),
                                            checkboxInput(inputId = "scatterPlot2", "Scatterplot", FALSE),
-                                           uiOutput("smooth2"))
+                                           uiOutput("smooth2")),
+                          conditionalPanel(condition = "input.tabs == 5",
+                                           fluidRow(
+                                             column(6,
+                                                    varSelectInput(inputId = "varYLav", label = "Variable Y (required)",
+                                                                   character(0),
+                                                                   multiple = FALSE),
+                                                    selectInput(inputId = "scaleLevelLav", label = "Scale level of Y:",
+                                                                choices = c("metric"),
+                                                                selected = "metric",
+                                                                width = '100%')
+                                                    ),
+                                             column(6,
+                                                    varSelectInput(inputId = "varsXLav", label = "Predictors X (required)",
+                                                                   character(0),
+                                                                   multiple = TRUE),
+                                                    varSelectInput(inputId = "clusterLav", label = "Cluster (optional)",
+                                                                   character(0),
+                                                                   selected = NULL,
+                                                                   multiple = TRUE))
+                                             ),
+                                           fluidRow(
+                                             column(6, HTML("<b>Model specification</b>"),
+                                                    checkboxInput(inputId = "fixedx", "Fixed Predictors (fixed.x)?", TRUE),
+                                                    checkboxInput(inputId = "meanStr", "Meanstructure?", TRUE),
+                                                    selectInput(inputId = "estimator", label = "Estimator:",
+                                                                choices = c("ML", "MLR", "PML", "MLM", "MLMVS", "MLMV",
+                                                                            "WLS", "DWLS", "GLS", "ULS"),
+                                                                selected = "ML",
+                                                                width = '50%'),
+                                                    selectInput(inputId = "miss", label = "Missing data:",
+                                                                choices = c("default", "direct", "ml", "fiml"),
+                                                                selected = "default",
+                                                                width = '50%')),
+                                             column(6, HTML("<b>Output</b>"),
+                                                    checkboxInput(inputId = "fit", "Fit measures?", FALSE),
+                                                    checkboxInput(inputId = "std", "Standardized solution?", FALSE),
+                                                    checkboxInput(inputId = "r2", "Explained Variance", FALSE))
+                                             ))
+                                             
                         ),
                         
                         mainPanel(
@@ -179,13 +218,17 @@ ui <- fluidPage(
                                       tabPanel("Regression Modeling", value = 4,
                                                verbatimTextOutput(outputId = "regOutput"),
                                                hr(),
-                                               plotOutput(outputId = "scatter2"), style='width: 65%')
+                                               plotOutput(outputId = "scatter2"), style='width: 65%'),
+                                      tabPanel("Path analysis", value = 5,
+                                               verbatimTextOutput(outputId = "lavOutput"),
+                                               hr()#,
+                                               #plotOutput(outputId = "scatter2"), style='width: 65%')
                                       )
                                       
                                       
                           )
                         )
-                      ),
+                      )),
              tabPanel("Information",
                       br(),
                       h4("This Shiny App is designed to calculate basic descriptive statistics."),
@@ -254,6 +297,10 @@ server <- function(input, output) {
   })
   
   observeEvent(dataInput(), {
+    updateSelectInput(session = getDefaultReactiveDomain(), "varYLav", choices = colnames(dataInput()))
+  })
+  
+  observeEvent(dataInput(), {
     updateSelectInput(session = getDefaultReactiveDomain(), "varX", choices = colnames(dataInput()))
   })
   
@@ -266,7 +313,15 @@ server <- function(input, output) {
   })
   
   observeEvent(dataInput(), {
+    updateSelectInput(session = getDefaultReactiveDomain(), "varsXLav", choices = colnames(dataInput()))
+  })
+  
+  observeEvent(dataInput(), {
     updateSelectInput(session = getDefaultReactiveDomain(), "cluster", choices = colnames(dataInput()))
+  })
+  
+  observeEvent(dataInput(), {
+    updateSelectInput(session = getDefaultReactiveDomain(), "clusterLav", choices = colnames(dataInput()))
   })
   
   
@@ -434,8 +489,10 @@ server <- function(input, output) {
   
   calctTest <- reactive({
     
-    t.test(x = dataInput()[,as.character(input$varX2)],
-           y = dataInput()[,as.character(input$varY2)],
+    myFormula <- as.formula( paste(input$varY2, "~", input$varX2 ) )
+    
+    t.test(formula = myFormula,
+           data = dataInput(),
            alternative = input$alternative2,
            conf.level = input$conf2,
            paired = input$paired,
@@ -533,6 +590,49 @@ server <- function(input, output) {
       }
     })
   
+  # Calculate path ####
+  
+  calcLav <- reactive({ 
+    
+    myModel <- paste(input$varYLav, "~", paste(input$varsXLav, collapse = "+") )
+    
+    if ( length(input$clusterLav) > 1 ) { stop("Only 1 cluster variable is supported.")}
+    
+    tempLav <- lavaan::sem(myModel,
+                           data = dataInput(),
+                           cluster = paste0(input$clusterLav),
+                           fixed.x = input$fixedx,
+                           meanstructure = input$meanStr,
+                           estimator = input$estimator,
+                           missing = input$miss)
+    lavaan::summary(tempLav,
+                    fit = input$fit,
+                    std = input$std,
+                    rsq = input$r2)
+    
+    })
+  
+  output$lavOutput <- renderPrint({
+    
+    if ( is.null(dataInput())) {
+      
+      HTML( "Please upload or choose an example data set.") 
+      
+    } else {
+      
+      if ( length(input$varYLav) == 0 |  length(input$varsXLav) == 0) {
+        
+        HTML( "Please select variables") 
+        
+      } else {
+        
+        calcLav()
+        
+      }
+    }
+    
+  })
+  
   output$smooth1 = renderUI({
     
     if (input$scatterPlot1 == FALSE) {
@@ -542,11 +642,28 @@ server <- function(input, output) {
       
       loesCheck <- checkboxInput(inputId = "smooth1", "Loess function?", FALSE)
       
-      sc1LabX <- textInput(inputId = "labX", "Label of x-Axis:", value = input$varX, width = '30%', placeholder = NULL)
-      sc1LabY <- textInput(inputId = "labY", "Label of y-Axis:", value = input$varY, width = '30%', placeholder = NULL)
-      sc1title <- textInput(inputId = "title", "Title of plot:", value = "", width = '30%', placeholder = NULL)
-    
-      sc1Ui <- list(loesCheck, hr(), h4("Cosmetics"), sc1LabX, sc1LabY, sc1title)
+      sc1LabX <- textInput(inputId = "labX", "Label of x-Axis:", value = input$varX, width = '100%', placeholder = NULL)
+      sc1LabY <- textInput(inputId = "labY", "Label of y-Axis:", value = input$varY, width = '100%', placeholder = NULL)
+      sc1title <- textInput(inputId = "title", "Title of plot:", value = "", width = '100%', placeholder = NULL)
+      sc1textSize <- numericInput(inputId = "sc1AxisTextSize", label =  "Axis text size:",
+                                  value = 20, step = 1, min = 1, max = 35, width = '100%')
+      sc1TitleTextSize <- numericInput(inputId = "sc1TitleTextSize", label =  "Title text size:",
+                                       value = 25, step = 1, min = 1, max = 35, width = '100%')
+      sc1Ui <- list(loesCheck, hr(),
+                    h4("Cosmetics"),
+                    fluidRow(
+                      column(8,
+                             sc1LabX,
+                             sc1LabY),
+                      column(4,
+                             sc1textSize)),
+                    fluidRow(
+                      column(8,
+                             sc1title),
+                      column(4,
+                             sc1TitleTextSize)
+                             )
+                    )
       sc1Ui
       }
     
@@ -583,13 +700,13 @@ server <- function(input, output) {
       
     sc1 <- ggplot(data = dataInput(),
            aes(y = .data[[input$varY]], x = .data[[input$varX]])) +
-      geom_point(color = "black", fill = "white", linewidth = 3, alpha = .25) +
+      geom_point(color = "black", fill = "white", size = 3, alpha = .25) +
       labs(x = input$labX, y = input$labY, title = input$title) +
       #geom_hline(yintercept = yMean, color = "black") +
       #geom_vline(yintercept = xMean, color = "black") +
-      theme_minimal() + theme(axis.text = element_text(size = 20),
-                              axis.title = element_text(size = 20),
-                              plot.title = element_text(size = 25, hjust = 0.5))
+      theme_minimal() + theme(axis.text = element_text(size = input$sc1AxisTextSize),
+                              axis.title = element_text(size = input$sc1AxisTextSize),
+                              plot.title = element_text(size = input$sc1TitleTextSize, hjust = 0.5))
     
     if ( input$smooth1 == FALSE ) {
       
@@ -600,7 +717,7 @@ server <- function(input, output) {
     
     sc1 <- sc1 + geom_smooth(method = "loess", formula = 'y ~ x',
                              se = FALSE, color = "darkred",
-                             linewidth = 2)
+                             linewidth = 1.5)
     sc1
     
     }
@@ -673,7 +790,13 @@ server <- function(input, output) {
       # Set up parameters to pass to Rmd document
       params <- list(data = dataInput(),
                      varX = input$varX,
-                     varY = input$varY)
+                     varY = input$varY,
+                     smooth1 = input$smooth1,
+                     labX = input$labX,
+                     labY = input$labY,
+                     title = input$title,
+                     sc1AxisTextSize = input$sc1AxisTextSize,
+                     sc1TitleTextSize = input$sc1TitleTextSize)
       
       # Knit the document, passing in the `params` list, and eval it in a
       # child of the global environment (this isolates the code in the document
