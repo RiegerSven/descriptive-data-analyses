@@ -2,10 +2,6 @@
 # This is a Shiny web application. You can run the application by clicking
 # the 'Run App' button above.
 #
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
-#
 
 library(shiny)
 library(ggplot2)
@@ -16,22 +12,42 @@ ui <- fluidPage(
              tabPanel("Analyses",
                       sidebarLayout(
                         sidebarPanel(
-                          tryCatch(
-                            fileInput("file1", "Data File ( !not ready to use...:(! )", 
-                                      accept=c(".csv"))
-                          ),
-                          helpText('Select a .csv file to be uploaded. The R function read.csv with the default settings for arguments.'),
-                          br(),
-                          selectizeInput(inputId="exdata", label="Example Data", selected="",
-                                         choices= c("",
-                                                    "no data",
-                                                    "Holzinger1939 (lavaan package)",
-                                                    "Highschool and beyond"),
-                                         options = list(placeholder = 'choose example data'),
-                                         width='50%'),  
-                          hr(),
                           conditionalPanel(condition = "input.tabs == 0",
-                                           checkboxInput(inputId = "showDatInfo", "str(data)", FALSE)),
+                                           fileInput("file1", "Select a .csv file to be uploaded:",
+                                                     multiple = FALSE,
+                                                     accept = c("text/csv",
+                                                                "text/comma-separated-values,text/plain",
+                                                                ".csv")),
+                                           checkboxInput("header", "Header", TRUE),
+                                           fluidRow(
+                                             column(4,
+                                                    radioButtons("sep", "Separator",
+                                                                 choices = c(Comma = ",",
+                                                                             Semicolon = ";",
+                                                                             Tab = "\t"),
+                                                                 selected = ";")),
+                                             column(4,
+                                                    radioButtons("dec", "Decimal",
+                                                                 choices = c(Comma = ",",
+                                                                             Period = "."),
+                                                                 selected = ".")),
+                                             column(4,
+                                                    radioButtons("quote", "Quote",
+                                                                 choices = c(None = "",
+                                                                             "Double Quote" = '"',
+                                                                              "Single Quote" = "'"),
+                                                                 selected = '"'))),
+                                           br(),
+                                           selectizeInput(inputId="exdata", label="Example Data", selected="",
+                                                          choices= c("",
+                                                                     "no data",
+                                                                     "Diamonds (ggplot2 package)",
+                                                                     "Holzinger1939 (lavaan package)",
+                                                                     "Highschool and beyond (merTools package)"),
+                                                          options = list(placeholder = 'choose example data'),
+                                                          width='50%'),
+                                           hr(),
+                                           checkboxInput(inputId = "showDatInfo", "Show information about the data set: str(data)", FALSE)),
                           conditionalPanel(condition = "input.tabs == 1",
                                            varSelectInput(inputId = "vars", label = "Variables (required)",
                                                           character(0),
@@ -43,14 +59,14 @@ ui <- fluidPage(
                                                     checkboxInput(inputId = "mean", "Mean", TRUE),
                                                     checkboxInput(inputId = "median", "Median", FALSE),
                                                     checkboxInput(inputId = "mode", "Mode", FALSE)),
-                                           column(4, HTML("<b>Measures of <br> variability</b>"),
-                                           checkboxInput(inputId = "sd", "Standard deviation", TRUE),
-                                           checkboxInput(inputId = "var", "Variance", FALSE),
-                                           checkboxInput(inputId = "min", "Minimum", FALSE),
-                                           checkboxInput(inputId = "max", "Maximum", FALSE)),
-                                           column(4, HTML("<b>Measures of <br> shape</b>"),
-                                           checkboxInput(inputId = "skew", "Skewness", FALSE),
-                                           checkboxInput(inputId = "kurt", "Kurtosis", FALSE))),
+                                             column(4, HTML("<b>Measures of <br> variability</b>"),
+                                                    checkboxInput(inputId = "sd", "Standard deviation", TRUE),
+                                                    checkboxInput(inputId = "var", "Variance", FALSE),
+                                                    checkboxInput(inputId = "min", "Minimum", FALSE),
+                                                    checkboxInput(inputId = "max", "Maximum", FALSE)),
+                                             column(4, HTML("<b>Measures of <br> shape</b>"),
+                                                    checkboxInput(inputId = "skew", "Skewness", FALSE),
+                                                    checkboxInput(inputId = "kurt", "Kurtosis", FALSE))),
                                            hr(),
                                            checkboxInput(inputId = "hist", "Density plots?", FALSE),
                                            uiOutput("histPlot")),
@@ -84,11 +100,42 @@ ui <- fluidPage(
                                                                  ))),
                                            hr(),
                                            checkboxInput(inputId = "scatterPlot1", "Scatterplot", FALSE),
-                                           uiOutput("smooth1")),
+                                           uiOutput("smooth1"),
+                                           hr(),
+                                           downloadButton("downloadCor", "Download correlation analysis")),
                           conditionalPanel(condition = "input.tabs == 3",
                                            fluidRow(
                                              column(6,
                                                     varSelectInput(inputId = "varY2", label = "Variable Y (required)",
+                                                                   character(0),
+                                                                   multiple = FALSE)),
+                                             column(6,
+                                                    varSelectInput(inputId = "varX2", label = "Group-Variable X (required)",
+                                                                   character(0),
+                                                                   multiple = FALSE))),
+                                           fluidRow(
+                                             column(4,
+                                                    numericInput(inputId = "mu", label =  "True value \u03BC",
+                                                                 value = 0, step = .1)),
+                                             column(4,
+                                                    selectInput(inputId = "alternative2", label = "Direction of hypothesis:",
+                                                                choices = c("two.sided", "less", "greater"),
+                                                                selected = "two.sided"#,
+                                                                #width = '30%'
+                                                                )),
+                                             column(4,
+                                                    numericInput(inputId = "conf2", label = "Confidence interval:",
+                                                                 value = 0.95, min = 0.001, max = .999, step = 0.01#,
+                                                                 #width = '30%'
+                                                                 ))),
+                                           checkboxInput(inputId = "var.equal", "Equal variances", FALSE),
+                                           checkboxInput(inputId = "paired", "Paired t-test", FALSE),
+                                           hr(),
+                                           checkboxInput(inputId = "boxplot", "Boxplot", FALSE)),
+                          conditionalPanel(condition = "input.tabs == 4",
+                                           fluidRow(
+                                             column(6,
+                                                    varSelectInput(inputId = "varYreg", label = "Variable Y (required)",
                                                                    character(0),
                                                                    multiple = FALSE),
                                                     selectInput(inputId = "scaleLevel", label = "Scale level of Y:",
@@ -96,7 +143,7 @@ ui <- fluidPage(
                                                                 selected = "metric",
                                                                 width = '100%')),
                                              column(6,
-                                                    varSelectInput(inputId = "varX2", label = "Variable X (required)",
+                                                    varSelectInput(inputId = "varsX", label = "Variable X (required)",
                                                                    character(0),
                                                                    multiple = TRUE),
                                                     varSelectInput(inputId = "cluster", label = "Cluster (optional)",
@@ -119,10 +166,16 @@ ui <- fluidPage(
                                                hr(),
                                                plotOutput(outputId = "hist"), style='width: 75%'),
                                       tabPanel("Correlation", value = 2,
+                                               #withMathJax("$$\\text{Display formula in heading }...$$"),
+                                               #hr(),
                                                verbatimTextOutput(outputId = "cor"),
                                                hr(),
                                                plotOutput(outputId = "scatter1"), style='width: 65%'),
-                                      tabPanel("Regression Modeling", value = 3,
+                                      tabPanel("t-Test", value = 3,
+                                               verbatimTextOutput(outputId = "tTest"),
+                                               hr(),
+                                               plotOutput(outputId = "boxplot"), style='width: 65%'),
+                                      tabPanel("Regression Modeling", value = 4,
                                                verbatimTextOutput(outputId = "regOutput"),
                                                hr(),
                                                plotOutput(outputId = "scatter2"), style='width: 65%')
@@ -145,30 +198,38 @@ server <- function(input, output) {
   
   # Reactive Data Input ####
   dataInput <- reactive({
-    inFile <- input$file1
-    exdata <- input$exdata
     
-    if(is.null(inFile)){      
-      if(exdata==""){
-        return(NULL)        
-      }else if(exdata=="Holzinger1939 (lavaan package)"){
-        dat <- lavaan::HolzingerSwineford1939
-        return(dat)  
-      } else if(exdata == "Highschool and beyond"){
-        dat <- merTools::hsb
-        return(dat)
-      }
-    }
-    
-    if(!is.null(inFile)){
+      if (is.null(input$file1$datapath)) {
+        
+        if(input$exdata==""){
+          return(NULL) 
+          } else if(input$exdata=="Diamonds (ggplot2 package)"){
+            dat <- ggplot2::diamonds
+            return(dat)
+        } else if(input$exdata=="Holzinger1939 (lavaan package)"){
+          dat <- lavaan::HolzingerSwineford1939
+          return(dat)  
+        } else if(input$exdata == "Highschool and beyond (merTools package)"){
+          dat <- merTools::hsb
+          return(dat)
+        }
+        
+        
+      } else {
+        
       
-      dat <- data.table::data.table ( read.csv2(inFile$datapath, header = T) )
+      dat <- tryCatch(data.table::data.table ( read.csv(input$file1$datapath,
+                                               header = input$header,
+                                               sep = input$sep,
+                                               quote = input$quote,
+                                               dec = input$dec) 
+                                      ))
+      
       return(dat)
-      
-    }
-    
-    
+      }
   })
+  
+  
   # Update Select Input ####
   observeEvent(dataInput(), {
     updateSelectInput(session = getDefaultReactiveDomain(), "vars", choices = colnames(dataInput()))
@@ -183,11 +244,19 @@ server <- function(input, output) {
   })
   
   observeEvent(dataInput(), {
+    updateSelectInput(session = getDefaultReactiveDomain(), "varYreg", choices = colnames(dataInput()))
+  })
+  
+  observeEvent(dataInput(), {
     updateSelectInput(session = getDefaultReactiveDomain(), "varX", choices = colnames(dataInput()))
   })
   
   observeEvent(dataInput(), {
     updateSelectInput(session = getDefaultReactiveDomain(), "varX2", choices = colnames(dataInput()))
+  })
+  
+  observeEvent(dataInput(), {
+    updateSelectInput(session = getDefaultReactiveDomain(), "varsX", choices = colnames(dataInput()))
   })
   
   observeEvent(dataInput(), {
@@ -203,34 +272,32 @@ server <- function(input, output) {
       ux <- unique(x)
       ux[which.max(tabulate(match(x, ux)))]
     }
+    myVars <- as.character(input$vars)
     
     tempDescr <- data.table::rbindlist(
-      lapply( 1:length(as.character(input$vars)),
+      lapply( 1:length(myVars),
               function(x) {
-                if ( is.numeric( dataInput()[,as.character(input$vars)[x]]) == TRUE |
-                     is.integer( dataInput()[,as.character(input$vars)[x]]) == TRUE ) {
-                  
-                mean <- mean(dataInput()[,as.character(input$vars)[x]], na.rm = T)
-                median <- stats::median(dataInput()[,as.character(input$vars)[x]], na.rm = T)
-                mode <- Mode(dataInput()[,as.character(input$vars)[x]])
-                sd <- sd(dataInput()[,as.character(input$vars)[x]], na.rm = T)
-                var <- var(dataInput()[,as.character(input$vars)[x]], na.rm = T)
-                min <- min(dataInput()[,as.character(input$vars)[x]], na.rm = T)
-                max <- max(dataInput()[,as.character(input$vars)[x]], na.rm = T)
-                skew <- moments::skewness(dataInput()[,as.character(input$vars)[x]], na.rm = T)
-                kurt <- moments::kurtosis(dataInput()[,as.character(input$vars)[x]], na.rm = T)
+                tempDat <- as.data.frame(dataInput()) # ugly ...
+                mean <- mean(tempDat[,myVars[x]], na.rm = T)
+                median <- stats::median(tempDat[,myVars[x]], na.rm = T)
+                mode <- Mode(tempDat[,myVars[x]])
+                sd <- sd(tempDat[,myVars[x]], na.rm = T)
+                var <- var(tempDat[,myVars[x]], na.rm = T)
+                min <- min(tempDat[,myVars[x]], na.rm = T)
+                max <- max(tempDat[,myVars[x]], na.rm = T)
+                skew <- moments::skewness(tempDat[,myVars[x]], na.rm = T)
+                kurt <- moments::kurtosis(tempDat[,myVars[x]], na.rm = T)
                 dat <- data.frame(Mean = mean, Median = median, Mode = mode,
                                   SD = sd, Var = var,
                                   Min = min, Max = max, Skew = skew, Kurtosis = kurt)
-                dat <- round(dat, 3) } else {
-                  stop("Variable must be of type numeric to calculate descriptive statistics.")
-                }
+                dat <- round(dat, 3) 
                 
                 return(dat)
               }), 
       idcol = "Variable")
     
-    tempDescr$Variable <- as.character(input$vars)
+    
+    tempDescr$Variable <- myVars
     tempDescr
     
   
@@ -244,7 +311,7 @@ server <- function(input, output) {
       HTML( "Please select variables") 
       
     } else {
-    
+      
       selDescr <- c("Variable",
                     "Mean", "Median", "Mode", "SD", "Var",
                     "Min", "Max", "Skew", "Kurtosis")[c(TRUE,
@@ -263,8 +330,6 @@ server <- function(input, output) {
     }
     
   })
-  
-  
   
   output$hist <- renderPlot({ 
     
@@ -313,14 +378,14 @@ server <- function(input, output) {
         stop("You need to select variables.")
       }
       
-    tempHist <- histPlot(data = dataInput(),
+    tempHist <- histPlot(data = as.data.frame(dataInput()),
                          item = as.character(input$vars))
     tempHist
     }
       
 
     })
-  
+  # Calculate correlation ####
   calcCorr <- reactive({
     
     cor.test(x = dataInput()[,as.character(input$varX)],
@@ -345,6 +410,34 @@ server <- function(input, output) {
     
   })
   
+  # Calculate t-Test ####
+  
+  calctTest <- reactive({
+    
+    t.test(x = dataInput()[,as.character(input$varX2)],
+           y = dataInput()[,as.character(input$varY2)],
+           alternative = input$alternative2,
+           conf.level = input$conf2,
+           paired = input$paired,
+           var.equal = input$var.equal,
+           mu = input$mu)
+    
+  })
+  
+  output$tTest <- renderPrint({
+    
+    if ( length(input$varY2) == 0 |  length(input$varX2) == 0) {
+      
+      HTML( "Please select variables") 
+      
+    } else {
+      
+      calctTest()
+      
+    }
+    
+  })
+  
   calcReg <- reactive({
     
     
@@ -364,7 +457,7 @@ server <- function(input, output) {
     
     if ( input$scaleLevel == "metric") {
       
-      myFormula <- as.formula( paste(input$varY2, "~", paste(input$varX2, collapse = "+") ) )
+      myFormula <- as.formula( paste(input$varYreg, "~", paste(input$varsX, collapse = "+") ) )
       summary(
         survey::svyglm(formula = myFormula, design = svyDesign,
                        family=stats::gaussian())
@@ -372,7 +465,7 @@ server <- function(input, output) {
       
     } else if ( input$scaleLevel == "binary") {
       
-      myFormula <- as.formula( paste(input$varY2, "~", paste(input$varX2, collapse = "+") ) )
+      myFormula <- as.formula( paste(input$varYreg, "~", paste(input$varsX, collapse = "+") ) )
       summary(
         survey::svyglm(formula = myFormula, design = svyDesign,
                        family=stats::binomial(link = "logit"))
@@ -380,7 +473,7 @@ server <- function(input, output) {
       
     } else if ( input$scaleLevel == "ordinal") {
       
-      myFormula <- as.formula( paste("as.factor(",input$varY2,")", "~", paste(input$varX2, collapse = "+") ) )
+      myFormula <- as.formula( paste("as.factor(",input$varYreg,")", "~", paste(input$varsX, collapse = "+") ) )
       summary(
         survey::svyolr(formula = myFormula, design = svyDesign)
       )
@@ -393,7 +486,7 @@ server <- function(input, output) {
   
   output$regOutput <- renderPrint({
     
-    if ( length(input$varY2) == 0 |  length(input$varX2) == 0) {
+    if ( length(input$varYreg) == 0 |  length(input$varsX) == 0) {
       
       HTML( "Please select variables") 
       
@@ -476,8 +569,6 @@ server <- function(input, output) {
     
   })
   
-  
-  
   output$scatter2 <- renderPlot({
     
     if ( input$scatterPlot2 == TRUE ) {
@@ -487,8 +578,8 @@ server <- function(input, output) {
       }
       
       sc2 <- ggplot(data = dataInput(),
-             aes(y = .data[[input$varY2]],
-                 x = .data[[as.character(input$varX2)[1]]])) +
+             aes(y = .data[[input$varYreg]],
+                 x = .data[[as.character(input$varsX)]])) +
         geom_point(color = "black", fill = "white", size = 3, alpha = .25) +
         geom_smooth(method = "lm", formula = 'y ~ x', se = FALSE) + 
         theme_minimal() + theme(axis.text = element_text(size = 20),
@@ -511,6 +602,43 @@ server <- function(input, output) {
     
   })
   
+  output$boxplot <- renderPlot({
+      
+    if ( input$boxplot == TRUE ) {
+    
+      tempBox <- ggplot(data = dataInput(),
+                    aes(y = .data[[input$varY2]],
+                        x = factor(.data[[input$varX2]]))) +
+        geom_boxplot(color = "black") +
+        theme_minimal() + theme(axis.text = element_text(size = 20),
+                                axis.title = element_text(size = 20))
+      tempBox
+    } 
+    
+  })
+  
+  output$downloadCor <- downloadHandler(
+    filename = "cor-output.docx",
+    content = function(file) {
+      tempCor <- file.path(tempdir(), "cor-analysis.Rmd")
+      file.copy("cor-analysis.Rmd", tempCor, overwrite = TRUE)
+      
+      # Set up parameters to pass to Rmd document
+      params <- list(data = dataInput(),
+                     varX = input$varX,
+                     varY = input$varY)
+      
+      # Knit the document, passing in the `params` list, and eval it in a
+      # child of the global environment (this isolates the code in the document
+      # from the code in this app).
+      rmarkdown::render(tempCor, output_file = file,
+                        params = params,
+                        envir = new.env(parent = globalenv())
+      )
+    
+    }
+  )
+  
   
   output$tbl = DT::renderDataTable({
     
@@ -522,7 +650,14 @@ server <- function(input, output) {
     
     if (input$showDatInfo == TRUE) {
       
-      str(dataInput())
+      if ( is.null(dataInput())) {
+        HTML("Please upload data or select an example data set.")
+      } else {
+        
+        str(dataInput())
+        
+      }
+      
       
     }
     
