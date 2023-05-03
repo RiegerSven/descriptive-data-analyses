@@ -6,7 +6,7 @@ You need the following R packages (hopefully i did not forget one):
 
 
 ```
-pkgList <- list("shiny", "data.table", "DT", "survey", "ggplot2")
+pkgList <- list("shiny", "data.table", "DT", "survey", "ggplot2", "rmarkdown")
 ```
 
 ```{r}
