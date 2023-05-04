@@ -1,0 +1,25 @@
+---
+title: "Descriptive Statistics"
+date: "`r Sys.Date()`"
+output: word_document
+params:
+  descrOut: NA
+  hist: NA
+---
+
+
+```{r, echo=FALSE}
+library(ggplot2)
+```
+
+
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+knitr::kable(params$descrOut,
+             caption = "Descriptive Statistics")
+```
+
+
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+params$hist
+```
+

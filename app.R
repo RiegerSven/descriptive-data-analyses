@@ -4,6 +4,7 @@
 #
 
 library(shiny)
+library(survey)
 library(ggplot2)
 
 ui <- fluidPage(
@@ -70,7 +71,8 @@ ui <- fluidPage(
                                                     checkboxInput(inputId = "kurt", "Kurtosis", FALSE))),
                                            hr(),
                                            checkboxInput(inputId = "hist", "Density plots?", FALSE),
-                                           uiOutput("histPlot")),
+                                           uiOutput("histPlot"),
+                                           downloadButton("downloadDescr", "Download descriptive statistics")),
                           conditionalPanel(condition = "input.tabs == 2",
                                            fluidRow(
                                              column(6,
@@ -363,6 +365,7 @@ server <- function(input, output) {
       lapply( 1:length(myVars),
               function(x) {
                 tempDat <- as.data.frame(dataInput()) # ugly ...
+                n <- sum(!is.na(tempDat[,myVars[x]]))
                 mean <- mean(tempDat[,myVars[x]], na.rm = T)
                 median <- stats::median(tempDat[,myVars[x]], na.rm = T)
                 mode <- Mode(tempDat[,myVars[x]])
@@ -372,7 +375,8 @@ server <- function(input, output) {
                 max <- max(tempDat[,myVars[x]], na.rm = T)
                 skew <- moments::skewness(tempDat[,myVars[x]], na.rm = T)
                 kurt <- moments::kurtosis(tempDat[,myVars[x]], na.rm = T)
-                dat <- data.frame(Mean = mean, Median = median, Mode = mode,
+                dat <- data.frame(N = n,
+                                  Mean = mean, Median = median, Mode = mode,
                                   SD = sd, Var = var,
                                   Min = min, Max = max, Skew = skew, Kurtosis = kurt)
                 dat <- round(dat, 3) 
@@ -383,7 +387,21 @@ server <- function(input, output) {
     
     
     tempDescr$Variable <- myVars
-    tempDescr
+    
+    selDescr <- c("Variable", "N",
+                  "Mean", "Median", "Mode", "SD", "Var",
+                  "Min", "Max", "Skew", "Kurtosis")[c(TRUE, TRUE,
+                                                      input$mean,
+                                                      input$median,
+                                                      input$mode,
+                                                      input$sd,
+                                                      input$var,
+                                                      input$min, 
+                                                      input$max,
+                                                      input$skew,
+                                                      input$kurt)]
+    
+    tempDescr[,..selDescr]
     
   
     
@@ -402,28 +420,15 @@ server <- function(input, output) {
       HTML( "Please select variables") 
       
     } else {
-      
-      selDescr <- c("Variable",
-                    "Mean", "Median", "Mode", "SD", "Var",
-                    "Min", "Max", "Skew", "Kurtosis")[c(TRUE,
-                                                        input$mean,
-                                                        input$median,
-                                                        input$mode,
-                                                        input$sd,
-                                                        input$var,
-                                                        input$min, 
-                                                        input$max,
-                                                        input$skew,
-                                                        input$kurt)]
         
-    calcDescr()[,..selDescr]
+    calcDescr()
      
     }
     }
     
   })
   
-  output$hist <- renderPlot({ 
+  hist <- reactive({
     
     histPlot <- function( data,
                           item,
@@ -465,18 +470,25 @@ server <- function(input, output) {
     }
     
     if ( input$hist == TRUE) {
-    
+      
       if ( length(as.character(input$vars)) == 0) {
         stop("You need to select variables.")
       }
       
-    tempHist <- histPlot(data = as.data.frame(dataInput()),
-                         item = as.character(input$vars))
-    tempHist
+      tempHist <- histPlot(data = as.data.frame(dataInput()),
+                           item = as.character(input$vars))
+      tempHist
     }
-      
+    
+  })
+  
+  output$hist <- renderPlot({ 
+    
+    
+    hist()
 
     })
+  
   # Calculate correlation ####
   calcCorr <- reactive({
     
@@ -706,6 +718,8 @@ server <- function(input, output) {
     
   })
   
+  # UI Stuff ####
+  
   output$smooth1 = renderUI({
     
     if (input$scatterPlot1 == FALSE) {
@@ -899,6 +913,30 @@ server <- function(input, output) {
     
   })
   
+  # Download buttos ####
+  
+  output$downloadDescr <- downloadHandler(
+    filename = "descriptive-output.docx",
+    content = function(file) {
+      tempDescr <- file.path(tempdir(), "descr-analysis.Rmd")
+      file.copy("descr-analysis.Rmd", tempDescr, overwrite = TRUE)
+      
+      # Set up parameters to pass to Rmd document
+      params <- list(descrOut = calcDescr(),
+                     hist = hist())
+      
+      # Knit the document, passing in the `params` list, and eval it in a
+      # child of the global environment (this isolates the code in the document
+      # from the code in this app).
+      rmarkdown::render(tempDescr, output_file = file,
+                        params = params,
+                        envir = new.env(parent = globalenv())
+      )
+      
+    }
+  )
+  
+  
   output$downloadCor <- downloadHandler(
     filename = "correlation-output.docx",
     content = function(file) {
@@ -906,9 +944,7 @@ server <- function(input, output) {
       file.copy("cor-analysis.Rmd", tempCor, overwrite = TRUE)
       
       # Set up parameters to pass to Rmd document
-      params <- list(data = dataInput(),
-                     varX = input$varX,
-                     varY = input$varY,
+      params <- list(corOut = calcCorr(),
                      scatterPlot = scatter1Reac())
       
       # Knit the document, passing in the `params` list, and eval it in a
@@ -929,8 +965,8 @@ server <- function(input, output) {
       file.copy("tTest-analysis.Rmd", temptTest, overwrite = TRUE)
       
       # Set up parameters to pass to Rmd document
-      params <- list(data = dataInput(),
-                     plot = boxplotTest())
+      params <- list(tTestOut = calctTest(),
+                     plot = boxplotReac())
       
       # Knit the document, passing in the `params` list, and eval it in a
       # child of the global environment (this isolates the code in the document
