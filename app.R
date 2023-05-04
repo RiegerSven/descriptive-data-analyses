@@ -900,7 +900,7 @@ server <- function(input, output) {
   })
   
   output$downloadCor <- downloadHandler(
-    filename = "cor-output.docx",
+    filename = "correlation-output.docx",
     content = function(file) {
       tempCor <- file.path(tempdir(), "cor-analysis.Rmd")
       file.copy("cor-analysis.Rmd", tempCor, overwrite = TRUE)
@@ -925,7 +925,7 @@ server <- function(input, output) {
   output$downloadtTest <- downloadHandler(
     filename = "tTest-output.docx",
     content = function(file) {
-      temptTest <- file.path(tempdir(), "cor-analysis.Rmd")
+      temptTest <- file.path(tempdir(), "tTest-analysis.Rmd")
       file.copy("tTest-analysis.Rmd", temptTest, overwrite = TRUE)
       
       # Set up parameters to pass to Rmd document
@@ -944,7 +944,7 @@ server <- function(input, output) {
   )
   
   output$downloadReg <- downloadHandler(
-    filename = "reg-output.docx",
+    filename = "regression-output.docx",
     content = function(file) {
       tempReg <- file.path(tempdir(), "reg-analysis.Rmd")
       file.copy("reg-analysis.Rmd", tempReg, overwrite = TRUE)
