@@ -72,6 +72,7 @@ ui <- fluidPage(
                                            hr(),
                                            checkboxInput(inputId = "hist", "Density plots?", FALSE),
                                            uiOutput("histPlot"),
+                                           hr(),
                                            downloadButton("downloadDescr", "Download descriptive statistics")),
                           conditionalPanel(condition = "input.tabs == 2",
                                            fluidRow(
@@ -171,10 +172,9 @@ ui <- fluidPage(
                                                     varSelectInput(inputId = "varYLav", label = "Variable Y (required)",
                                                                    character(0),
                                                                    multiple = TRUE),
-                                                    selectInput(inputId = "scaleLevelLav", label = "Scale level of Y:",
-                                                                choices = c("metric"),
-                                                                selected = "metric",
-                                                                width = '100%')
+                                                    varSelectInput(inputId = "orderedLav", label = "Ordered Y variables:",
+                                                                   character(0),
+                                                                   multiple = TRUE)
                                                     ),
                                              column(6,
                                                     varSelectInput(inputId = "varsXLav", label = "Predictors X (required)",
@@ -183,21 +183,27 @@ ui <- fluidPage(
                                                     varSelectInput(inputId = "clusterLav", label = "Cluster (optional)",
                                                                    character(0),
                                                                    selected = NULL,
+                                                                   multiple = FALSE),
+                                                    varSelectInput(inputId = "weightLav", label = "Weight (optional)",
+                                                                   character(0),
+                                                                   selected = NULL,
                                                                    multiple = FALSE))
                                              ),
+                                           hr(),
                                            fluidRow(
                                              column(6, HTML("<b>Model specification</b>"),
                                                     checkboxInput(inputId = "fixedx", "Fixed Predictors (fixed.x)?", TRUE),
                                                     checkboxInput(inputId = "meanStr", "Meanstructure?", TRUE),
                                                     selectInput(inputId = "estimator", label = "Estimator:",
                                                                 choices = c("ML", "MLR", "PML", "MLM", "MLMVS", "MLMV",
-                                                                            "WLS", "DWLS", "GLS", "ULS"),
+                                                                            "WLS", "WLSMV", "DWLS", "GLS", "ULS", "ULSM", "ULSMV"),
                                                                 selected = "ML",
-                                                                width = '50%'),
+                                                                width = '55%'),
                                                     selectInput(inputId = "miss", label = "Missing data:",
-                                                                choices = c("default", "direct", "ml", "fiml"),
+                                                                choices = c("default", "direct", "ml", "fiml", "listwise", "pairwise",
+                                                                            "available.cases"),
                                                                 selected = "default",
-                                                                width = '50%')),
+                                                                width = '70%')),
                                              column(6, HTML("<b>Output</b>"),
                                                     checkboxInput(inputId = "fit", "Fit measures?", FALSE),
                                                     checkboxInput(inputId = "std", "Standardized solution?", FALSE),
@@ -318,6 +324,11 @@ server <- function(input, output) {
   })
   
   observeEvent(dataInput(), {
+    updateSelectInput(session = getDefaultReactiveDomain(), "orderedLav", choices = c("", colnames(dataInput())),
+                      selected = "")
+  })
+  
+  observeEvent(dataInput(), {
     updateSelectInput(session = getDefaultReactiveDomain(), "varX", choices = c("", colnames(dataInput())),
                       selected = "")
   })
@@ -348,6 +359,11 @@ server <- function(input, output) {
   observeEvent(dataInput(), {
     updateSelectInput(session = getDefaultReactiveDomain(), "clusterLav", choices = c("no clustering", colnames(dataInput())),
                       selected = "no clustering")
+  })
+  
+  observeEvent(dataInput(), {
+    updateSelectInput(session = getDefaultReactiveDomain(), "weightLav", choices = c("no weighting", colnames(dataInput())),
+                      selected = "no weighting")
   })
   
   
@@ -681,15 +697,27 @@ server <- function(input, output) {
       lavCluster <- NULL
     } else {
       lavCluster <- paste0(input$clusterLav)
-      }
+    }
+    
+    if ( input$weightLav == "no weighting" ) { 
+      
+      lavWeight <- input$weightLav
+      lavWeight <- NULL
+    } else {
+      lavWeight <- paste0(input$lavWeight)
+    }
+    
+    
     
     tempLav <- lavaan::sem(myModel,
                            data = dataInput(),
                            cluster = lavCluster,
+                           sampling.weights = lavWeight,
                            fixed.x = input$fixedx,
                            meanstructure = input$meanStr,
                            estimator = input$estimator,
-                           missing = input$miss)
+                           missing = input$miss,
+                           ordered = paste0(input$orderedLav))
     lavaan::summary(tempLav,
                     fit = input$fit,
                     std = input$std,
