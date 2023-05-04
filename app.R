@@ -83,7 +83,7 @@ ui <- fluidPage(
                                                                    multiple = FALSE))),
                                            fluidRow(
                                              column(4,
-                                                    selectInput(inputId = "method ", label = "Method :",
+                                                    selectInput(inputId = "method", label = "Method:",
                                                                 choices = c("pearson", "kendall", "spearman"),
                                                                 selected = "pearson"#,
                                                                 #width = '30%'
@@ -132,13 +132,16 @@ ui <- fluidPage(
                                            checkboxInput(inputId = "var.equal", "Equal variances", FALSE),
                                            checkboxInput(inputId = "paired", "Paired t-test", FALSE),
                                            hr(),
-                                           checkboxInput(inputId = "boxplot", "Boxplot", FALSE)),
+                                           checkboxInput(inputId = "boxplot", "Boxplot", FALSE),
+                                           uiOutput("boxUi"),
+                                           hr(),
+                                           downloadButton("downloadtTest", "Download t-Test analysis")),
                           conditionalPanel(condition = "input.tabs == 4",
                                            fluidRow(
                                              column(6,
                                                     varSelectInput(inputId = "varYreg", label = "Variable Y (required)",
                                                                    character(0),
-                                                                   multiple = FALSE),
+                                                                   multiple = TRUE),
                                                     selectInput(inputId = "scaleLevel", label = "Scale level of Y:",
                                                                 choices = c("metric", "ordinal", "binary"),
                                                                 selected = "metric",
@@ -150,16 +153,22 @@ ui <- fluidPage(
                                                     varSelectInput(inputId = "cluster", label = "Cluster (optional)",
                                                                    character(0),
                                                                    selected = NULL,
-                                                                   multiple = TRUE))),
+                                                                   multiple = FALSE),
+                                                    varSelectInput(inputId = "weight", label = "Weight (optional)",
+                                                                   character(0),
+                                                                   selected = NULL,
+                                                                   multiple = FALSE))),
                                            hr(),
                                            checkboxInput(inputId = "scatterPlot2", "Scatterplot", FALSE),
-                                           uiOutput("smooth2")),
+                                           uiOutput("smooth2"),
+                                           hr(),
+                                           downloadButton("downloadReg", "Download regression analysis")),
                           conditionalPanel(condition = "input.tabs == 5",
                                            fluidRow(
                                              column(6,
                                                     varSelectInput(inputId = "varYLav", label = "Variable Y (required)",
                                                                    character(0),
-                                                                   multiple = FALSE),
+                                                                   multiple = TRUE),
                                                     selectInput(inputId = "scaleLevelLav", label = "Scale level of Y:",
                                                                 choices = c("metric"),
                                                                 selected = "metric",
@@ -172,7 +181,7 @@ ui <- fluidPage(
                                                     varSelectInput(inputId = "clusterLav", label = "Cluster (optional)",
                                                                    character(0),
                                                                    selected = NULL,
-                                                                   multiple = TRUE))
+                                                                   multiple = FALSE))
                                              ),
                                            fluidRow(
                                              column(6, HTML("<b>Model specification</b>"),
@@ -221,20 +230,24 @@ ui <- fluidPage(
                                                plotOutput(outputId = "scatter2"), style='width: 65%'),
                                       tabPanel("Path analysis", value = 5,
                                                verbatimTextOutput(outputId = "lavOutput"),
-                                               hr()#,
-                                               #plotOutput(outputId = "scatter2"), style='width: 65%')
+                                               hr(),
+                                               #plotOutput(outputId = "scatter2")
+                                               style='width: 65%')
                                       )
                                       
                                       
                           )
                         )
-                      )),
+                      ),
              tabPanel("Information",
                       br(),
                       h4("This Shiny App is designed to calculate basic descriptive statistics."),
                       )
-             )
-  )
+             ))
+
+  
+
+  
 
 
 
@@ -285,11 +298,13 @@ server <- function(input, output) {
   })
   
   observeEvent(dataInput(), {
-    updateSelectInput(session = getDefaultReactiveDomain(), "varY", choices = colnames(dataInput()))
+    updateSelectInput(session = getDefaultReactiveDomain(), "varY", choices = c("", colnames(dataInput())),
+                      selected = "")
   })
   
   observeEvent(dataInput(), {
-    updateSelectInput(session = getDefaultReactiveDomain(), "varY2", choices = colnames(dataInput()))
+    updateSelectInput(session = getDefaultReactiveDomain(), "varY2", choices = c("", colnames(dataInput())),
+                      selected = "")
   })
   
   observeEvent(dataInput(), {
@@ -301,11 +316,13 @@ server <- function(input, output) {
   })
   
   observeEvent(dataInput(), {
-    updateSelectInput(session = getDefaultReactiveDomain(), "varX", choices = colnames(dataInput()))
+    updateSelectInput(session = getDefaultReactiveDomain(), "varX", choices = c("", colnames(dataInput())),
+                      selected = "")
   })
   
   observeEvent(dataInput(), {
-    updateSelectInput(session = getDefaultReactiveDomain(), "varX2", choices = colnames(dataInput()))
+    updateSelectInput(session = getDefaultReactiveDomain(), "varX2", choices = c("", colnames(dataInput())),
+                      selected = "")
   })
   
   observeEvent(dataInput(), {
@@ -317,11 +334,18 @@ server <- function(input, output) {
   })
   
   observeEvent(dataInput(), {
-    updateSelectInput(session = getDefaultReactiveDomain(), "cluster", choices = colnames(dataInput()))
+    updateSelectInput(session = getDefaultReactiveDomain(), "cluster", choices = c("no clustering", colnames(dataInput())),
+                      selected = "no clustering")
   })
   
   observeEvent(dataInput(), {
-    updateSelectInput(session = getDefaultReactiveDomain(), "clusterLav", choices = colnames(dataInput()))
+    updateSelectInput(session = getDefaultReactiveDomain(), "weight", choices = c("no weighting", colnames(dataInput())),
+                      selected = "no weighting")
+  })
+  
+  observeEvent(dataInput(), {
+    updateSelectInput(session = getDefaultReactiveDomain(), "clusterLav", choices = c("no clustering", colnames(dataInput())),
+                      selected = "no clustering")
   })
   
   
@@ -425,9 +449,9 @@ server <- function(input, output) {
       
       tempPlot <- ggplot(data = data,
                          aes( x = val)) +
-        geom_histogram(aes(y=..density..),
+        geom_histogram(aes(y=after_stat(density)),
                        fill = "lightgrey", color = "black", bins = 30) +
-        geom_density(aes(y=..density..), fill = "lightblue", alpha = .5) +
+        geom_density(aes(y=after_stat(density)), fill = "lightblue", alpha = .5) +
         facet_wrap(~item, scales = "free", ncol = facetNcol) +
         labs(x = xLab, y = yLab) +
         theme_minimal() +
@@ -459,7 +483,7 @@ server <- function(input, output) {
     cor.test(x = dataInput()[,as.character(input$varX)],
              y = dataInput()[,as.character(input$varY)],
              alternative = input$alternative,
-             method = input$method,
+             method = paste0(input$method),
              conf.level = input$conf)
     
   })
@@ -499,6 +523,7 @@ server <- function(input, output) {
            var.equal = input$var.equal,
            mu = input$mu)
     
+    
   })
   
   output$tTest <- renderPrint({
@@ -528,26 +553,56 @@ server <- function(input, output) {
   # Calculate Regression ####
   calcReg <- reactive({
     
-    if ( length(as.character(input$cluster)) > 1) {
-      stop("only one cluster is supported")
-    
-      } else if (length(as.character(input$cluster)) == 0) {
+    if (input$cluster == "no clustering") {
       
-      svyDesign <- survey::svydesign(ids =~ 1, probs =~ NULL, data = dataInput())
+      Cluster <- input$cluster
+      Cluster <- ~ 1 
       
       } else {
-        Cluster <- dataInput()[,as.character(input$cluster)]
-        svyDesign <- survey::svydesign(ids = Cluster, probs =~ NULL, data = dataInput())
+        
+        Cluster <- dataInput()[,paste0(input$cluster)]
         
       }
     
+    if (input$weight == "no weighting") {
+      
+      Weight <- input$weight
+      Weight <- NULL 
+      
+    } else {
+      
+      Weight <- dataInput()[,paste0(input$weight)]
+      
+    }
+    
+      svyDesign <- survey::svydesign(ids = Cluster, weight = Weight, data = dataInput())
+      
+     
     if ( input$scaleLevel == "metric") {
       
-      myFormula <- as.formula( paste(input$varYreg, "~", paste(input$varsX, collapse = "+") ) )
-      summary(
-        survey::svyglm(formula = myFormula, design = svyDesign,
-                       family=stats::gaussian())
-      )
+      if (length(as.character(input$varYreg)) > 1 ) {
+        
+        modelRes <- lapply(1:length(as.character(input$varYreg)),
+               function(x) {
+                 tempFormula <- as.formula( paste(as.character(input$varYreg)[x], "~", paste(input$varsX, collapse = "+") ) )
+                 
+                 tempMod <- survey::svyglm(formula = tempFormula, design = svyDesign,
+                                           family=stats::gaussian())
+                 return(tempMod)
+                 
+               })
+        
+        modelRes
+        
+      } else {
+        
+        myFormula <- as.formula( paste(input$varYreg, "~", paste(input$varsX, collapse = "+") ) )
+        
+        modelRes <- survey::svyglm(formula = myFormula, design = svyDesign,
+                                   family=stats::gaussian())
+        modelRes
+      }
+      
       
     } else if ( input$scaleLevel == "binary") {
       
@@ -584,7 +639,19 @@ server <- function(input, output) {
         
         } else {
           
-          calcReg()
+          if ( length(input$varYreg) > 1 ) {
+            
+            lapply(calcReg(),
+                   function(x) jtools::summ( x ) )
+            
+            
+          } else {
+            
+            jtools::summ( calcReg() )
+            
+          }
+          
+          
           
         }
       }
@@ -596,11 +663,17 @@ server <- function(input, output) {
     
     myModel <- paste(input$varYLav, "~", paste(input$varsXLav, collapse = "+") )
     
-    if ( length(input$clusterLav) > 1 ) { stop("Only 1 cluster variable is supported.")}
+    if ( input$clusterLav == "no clustering" ) { 
+      
+      lavCluster <- input$clusterLav
+      lavCluster <- NULL
+    } else {
+      lavCluster <- paste0(input$clusterLav)
+      }
     
     tempLav <- lavaan::sem(myModel,
                            data = dataInput(),
-                           cluster = paste0(input$clusterLav),
+                           cluster = lavCluster,
                            fixed.x = input$fixedx,
                            meanstructure = input$meanStr,
                            estimator = input$estimator,
@@ -686,42 +759,78 @@ server <- function(input, output) {
     
   })
   
+  output$boxUi = renderUI({
+    
+    if (input$boxplot == FALSE) {
+      return(NULL)
+      
+    } else {
+      
+      boxLabX <- textInput(inputId = "boxlabX", "Label of x-Axis:", value = input$varX2, width = '100%', placeholder = NULL)
+      boxLabY <- textInput(inputId = "boxlabY", "Label of y-Axis:", value = input$varY2, width = '100%', placeholder = NULL)
+      boxtitle <- textInput(inputId = "boxtitle", "Title of plot:", value = "", width = '100%', placeholder = NULL)
+      boxtextSize <- numericInput(inputId = "boxAxisTextSize", label =  "Axis text size:",
+                                  value = 20, step = 1, min = 1, max = 35, width = '100%')
+      boxTitleTextSize <- numericInput(inputId = "boxTitleTextSize", label =  "Title text size:",
+                                       value = 25, step = 1, min = 1, max = 35, width = '100%')
+      boxUi <- list(h4("Cosmetics"),
+                    fluidRow(
+                      column(8,
+                             boxLabX,
+                             boxLabY),
+                      column(4,
+                             boxtextSize)),
+                    fluidRow(
+                      column(8,
+                             boxtitle),
+                      column(4,
+                             boxTitleTextSize)
+                    )
+      )
+      boxUi
+    }
+    
+    
+    
+  })
   
-  output$scatter1 <- renderPlot({
+  
+  scatter1Reac <- reactive({
     
     if ( input$scatterPlot1 == TRUE ) {
       
       if ( length(as.character(input$varY)) == 0 | length(as.character(input$varX)) == 0) {
         stop("You need to select variables.")
       }
-    
-      #yMean <- mean(dataInput()[,as.character(input$varY)], na.rm = T)
-      #xMean <- mean(dataInput()[,as.character(input$varX)], na.rm = T)
       
-    sc1 <- ggplot(data = dataInput(),
-           aes(y = .data[[input$varY]], x = .data[[input$varX]])) +
-      geom_point(color = "black", fill = "white", size = 3, alpha = .25) +
-      labs(x = input$labX, y = input$labY, title = input$title) +
-      #geom_hline(yintercept = yMean, color = "black") +
-      #geom_vline(yintercept = xMean, color = "black") +
-      theme_minimal() + theme(axis.text = element_text(size = input$sc1AxisTextSize),
-                              axis.title = element_text(size = input$sc1AxisTextSize),
-                              plot.title = element_text(size = input$sc1TitleTextSize, hjust = 0.5))
-    
-    if ( input$smooth1 == FALSE ) {
+      sc1 <- ggplot(data = dataInput(),
+                    aes(y = .data[[input$varY]], x = .data[[input$varX]])) +
+        geom_point(color = "black", fill = "white", size = 3, alpha = .25) +
+        labs(x = input$labX, y = input$labY, title = input$title) +
+        theme_minimal() + theme(axis.text = element_text(size = input$sc1AxisTextSize),
+                                axis.title = element_text(size = input$sc1AxisTextSize),
+                                plot.title = element_text(size = input$sc1TitleTextSize, hjust = 0.5))
       
-      sc1
-      
-      
-    } else {
-    
-    sc1 <- sc1 + geom_smooth(method = "loess", formula = 'y ~ x',
-                             se = FALSE, color = "darkred",
-                             linewidth = 1.5)
-    sc1
-    
+      if ( input$smooth1 == FALSE ) {
+        
+        sc1
+        
+        
+      } else {
+        
+        sc1 <- sc1 + geom_smooth(method = "loess", formula = 'y ~ x',
+                                 se = FALSE, color = "darkred",
+                                 linewidth = 1.5)
+        sc1
+        
+      }
     }
-    }
+    
+  })
+  
+  output$scatter1 <- renderPlot({
+    
+    scatter1Reac()
     
   })
   
@@ -734,7 +843,7 @@ server <- function(input, output) {
       }
       
       if ( length(input$varX2) > 1 ) {
-        stop("visualizing is only available for 2 variables in total")
+        stop("visualizing is only available for 2 variables in total (Y and X)")
       }
       
       sc2 <- ggplot(data = dataInput(),
@@ -762,22 +871,31 @@ server <- function(input, output) {
     
   })
   
-  output$boxplot <- renderPlot({
-      
+  boxplotReac <- reactive({
+    
     if ( input$boxplot == TRUE ) {
       
       if ( length(as.character(input$varY2)) == 0 | length(as.character(input$varX2)) == 0) {
         stop("You need to select variables.")
       }
-    
+      
       tempBox <- ggplot(data = dataInput(),
-                    aes(y = .data[[input$varY2]],
-                        x = factor(.data[[input$varX2]]))) +
-        geom_boxplot(color = "black") +
+                        aes(y = .data[[input$varY2]],
+                            x = factor(.data[[input$varX2]]))) +
+        geom_boxplot(color = "black", width = .3, outlier.colour="red") +
+        #geom_jitter(color = "lightgrey", alpha = .25, shape=16, position=position_jitter(0.1)) +
+        stat_summary(fun=mean, geom="point", shape=4, color ="black", size = 4) +
+        labs(x = input$boxlabX, y = input$boxlabY, title = input$boxtitle) +
         theme_minimal() + theme(axis.text = element_text(size = 20),
                                 axis.title = element_text(size = 20))
       tempBox
     } 
+    
+  })
+  
+  output$boxplot <- renderPlot({
+      
+    boxplotReac()
     
   })
   
@@ -791,12 +909,7 @@ server <- function(input, output) {
       params <- list(data = dataInput(),
                      varX = input$varX,
                      varY = input$varY,
-                     smooth1 = input$smooth1,
-                     labX = input$labX,
-                     labY = input$labY,
-                     title = input$title,
-                     sc1AxisTextSize = input$sc1AxisTextSize,
-                     sc1TitleTextSize = input$sc1TitleTextSize)
+                     scatterPlot = scatter1Reac())
       
       # Knit the document, passing in the `params` list, and eval it in a
       # child of the global environment (this isolates the code in the document
@@ -806,6 +919,48 @@ server <- function(input, output) {
                         envir = new.env(parent = globalenv())
       )
     
+    }
+  )
+  
+  output$downloadtTest <- downloadHandler(
+    filename = "tTest-output.docx",
+    content = function(file) {
+      temptTest <- file.path(tempdir(), "cor-analysis.Rmd")
+      file.copy("tTest-analysis.Rmd", temptTest, overwrite = TRUE)
+      
+      # Set up parameters to pass to Rmd document
+      params <- list(data = dataInput(),
+                     plot = boxplotTest())
+      
+      # Knit the document, passing in the `params` list, and eval it in a
+      # child of the global environment (this isolates the code in the document
+      # from the code in this app).
+      rmarkdown::render(temptTest, output_file = file,
+                        params = params,
+                        envir = new.env(parent = globalenv())
+      )
+      
+    }
+  )
+  
+  output$downloadReg <- downloadHandler(
+    filename = "reg-output.docx",
+    content = function(file) {
+      tempReg <- file.path(tempdir(), "reg-analysis.Rmd")
+      file.copy("reg-analysis.Rmd", tempReg, overwrite = TRUE)
+      
+      # Set up parameters to pass to Rmd document
+      params <- list(data = dataInput(),
+                     regOut = calcReg())
+      
+      # Knit the document, passing in the `params` list, and eval it in a
+      # child of the global environment (this isolates the code in the document
+      # from the code in this app).
+      rmarkdown::render(tempReg, output_file = file,
+                        params = params,
+                        envir = new.env(parent = globalenv())
+      )
+      
     }
   )
   
