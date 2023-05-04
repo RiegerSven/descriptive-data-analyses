@@ -1,19 +1,23 @@
 ---
-title: "Regression analysis"
+title: "t-Test"
 date: "`r Sys.Date()`"
 output: word_document
 params:
-  data: NA
+  tTestOut: NA
   plot: NA
 ---
 
 
 ```{r, echo=FALSE}
 library(ggplot2)
-dat <- params$data
 ```
 
+```{r, eval=TRUE, echo=FALSE}
 
+params$tTestOut
+
+
+```
 
 
 ```{r, eval=TRUE, echo=FALSE}

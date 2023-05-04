@@ -3,27 +3,18 @@ title: "Correlation"
 date: "`r Sys.Date()`"
 output: word_document
 params:
-  data: NA
-  varX: NA
-  varY: NA
+  corOut: NA
   scatterPlot: NA
 ---
 
 
 ```{r, echo=FALSE}
 library(ggplot2)
-dat <- params$data
 ```
 
 
-
-
-```{r, eval=TRUE, echo=FALSE}
-
-cor.test(x = dat[,paste0(params$varX)],
-         y = dat[,paste0(params$varY)])
-
-
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+params$corOut
 ```
 
 
