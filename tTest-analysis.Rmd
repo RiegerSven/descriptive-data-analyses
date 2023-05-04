@@ -1,0 +1,28 @@
+---
+title: "Regression analysis"
+date: "`r Sys.Date()`"
+output: word_document
+params:
+  data: NA
+  plot: NA
+---
+
+
+```{r, echo=FALSE}
+library(ggplot2)
+dat <- params$data
+```
+
+
+
+
+```{r, eval=TRUE, echo=FALSE}
+
+params$plot
+
+
+```
+
+
+
+
