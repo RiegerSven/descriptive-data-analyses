@@ -15,7 +15,8 @@ library(ggplot2)
 
 ```{r, eval=TRUE, echo=FALSE, warning=FALSE}
 knitr::kable(params$descrOut,
-             caption = "Descriptive Statistics")
+             caption = "Descriptive Statistics",
+             format = "pipe")
 ```
 
 

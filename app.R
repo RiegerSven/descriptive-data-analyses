@@ -13,7 +13,7 @@ ui <- fluidPage(
              tabPanel("Analyses",
                       sidebarLayout(
                         sidebarPanel(
-                          conditionalPanel(condition = "input.tabs == 0",
+                          conditionalPanel(condition = "input.tabs == 0", # data ui ####
                                            fileInput("file1", "Select a .csv file to be uploaded:",
                                                      multiple = FALSE,
                                                      accept = c("text/csv",
@@ -50,7 +50,7 @@ ui <- fluidPage(
                                            hr(),
                                            checkboxInput(inputId = "showDatInfo", "Show information about the data set: str(data)", FALSE)
                                            ),
-                          conditionalPanel(condition = "input.tabs == 1",
+                          conditionalPanel(condition = "input.tabs == 1", # descriptive ui ####
                                            varSelectInput(inputId = "vars", label = "Variables (required)",
                                                           character(0),
                                                           multiple = TRUE),
@@ -74,7 +74,7 @@ ui <- fluidPage(
                                            uiOutput("histPlot"),
                                            hr(),
                                            downloadButton("downloadDescr", "Download descriptive statistics")),
-                          conditionalPanel(condition = "input.tabs == 2",
+                          conditionalPanel(condition = "input.tabs == 2", # correlation ui ####
                                            fluidRow(
                                              column(6,
                                                     varSelectInput(inputId = "varY", label = "Variable Y (required)",
@@ -107,12 +107,12 @@ ui <- fluidPage(
                                            uiOutput("smooth1"),
                                            hr(),
                                            downloadButton("downloadCor", "Download correlation analysis")),
-                          conditionalPanel(condition = "input.tabs == 3",
+                          conditionalPanel(condition = "input.tabs == 3", # t-Test ui ####
                                            fluidRow(
                                              column(6,
                                                     varSelectInput(inputId = "varY2", label = "Variable Y (required)",
                                                                    character(0),
-                                                                   multiple = FALSE)),
+                                                                   multiple = TRUE)),
                                              column(6,
                                                     varSelectInput(inputId = "varX2", label = "Group-Variable X (required)",
                                                                    character(0),
@@ -135,11 +135,13 @@ ui <- fluidPage(
                                            checkboxInput(inputId = "var.equal", "Equal variances", FALSE),
                                            checkboxInput(inputId = "paired", "Paired t-test", FALSE),
                                            hr(),
+                                           checkboxInput(inputId = "tTestResFormat", label = "Table?", FALSE),
+                                           hr(),
                                            checkboxInput(inputId = "boxplot", "Boxplot", FALSE),
                                            uiOutput("boxUi"),
                                            hr(),
                                            downloadButton("downloadtTest", "Download t-Test analysis")),
-                          conditionalPanel(condition = "input.tabs == 4",
+                          conditionalPanel(condition = "input.tabs == 4", # regression ui ####
                                            fluidRow(
                                              column(6,
                                                     varSelectInput(inputId = "varYreg", label = "Variable Y (required)",
@@ -166,7 +168,7 @@ ui <- fluidPage(
                                            uiOutput("smooth2"),
                                            hr(),
                                            downloadButton("downloadReg", "Download regression analysis")),
-                          conditionalPanel(condition = "input.tabs == 5",
+                          conditionalPanel(condition = "input.tabs == 5", # path analysis ui ####
                                            fluidRow(
                                              column(6,
                                                     varSelectInput(inputId = "varYLav", label = "Variable Y (required)",
@@ -230,6 +232,7 @@ ui <- fluidPage(
                                                plotOutput(outputId = "scatter1"), style='width: 65%'),
                                       tabPanel("t-Test", value = 3,
                                                verbatimTextOutput(outputId = "tTest"),
+                                               uiOutput("tTestTab"),
                                                hr(),
                                                plotOutput(outputId = "boxplot"), style='width: 65%'),
                                       tabPanel("Regression Modeling", value = 4,
@@ -541,9 +544,30 @@ server <- function(input, output) {
   
   calctTest <- reactive({
     
+    
+    if (length(as.character(input$varY2)) > 1 ) {
+      
+      tTestRes <- lapply(1:length(as.character(input$varY2)),
+                         function(x) {
+                           
+                           tempFormula <- as.formula( paste(input$varY2[x], "~", input$varX2 ) )
+                           temptTest <- t.test(formula = tempFormula,
+                                               data = dataInput(),
+                                               alternative = input$alternative2,
+                                               conf.level = input$conf2,
+                                               paired = input$paired,
+                                               var.equal = input$var.equal,
+                                               mu = input$mu)
+                           return(temptTest)
+                           
+                         })
+      tTestRes
+    
+    } else {
+      
     myFormula <- as.formula( paste(input$varY2, "~", input$varX2 ) )
     
-    t.test(formula = myFormula,
+    tTestRes <- t.test(formula = myFormula,
            data = dataInput(),
            alternative = input$alternative2,
            conf.level = input$conf2,
@@ -551,33 +575,112 @@ server <- function(input, output) {
            var.equal = input$var.equal,
            mu = input$mu)
     
-    
-  })
-  
-  output$tTest <- renderPrint({
-    
-    if ( is.null(dataInput())) {
-      
-      HTML( "Please upload or choose an example data set.") 
-      
-    } else {
-      
-      if ( length(input$varY2) == 0 |  length(input$varX2) == 0) {
-        
-        HTML( "Please select variables") 
-        
-      } else {
-        
-        calctTest()
-        
-      }
-      
-      
+    tTestRes
     }
     
     
-    
   })
+  
+  
+  output$tTest <- renderPrint({
+      
+      if ( is.null(dataInput())) {
+        
+        HTML( "Please upload or choose an example data set.") 
+        
+      } else {
+        
+        if ( length(input$varY2) == 0 |  length(input$varX2) == 0) {
+          
+          HTML( "Please select variables") 
+          
+        } else {
+          
+          if ( length(input$varY2) > 1 ) {
+            
+            lapply(calctTest(),
+                   function(x) x)
+            
+          } else {
+            
+            calctTest()
+          }
+          
+        }
+        }
+    }) 
+  
+  output$tTestTab <- renderUI({
+    
+    if ( input$tTestResFormat == TRUE ) {
+    
+    if ( length(input$varY2) > 1 ) {
+            
+            tTestRes <- lapply(calctTest(),
+                               function(x) {
+                                 
+                                 tempRes <- as.data.frame(
+                                   t(
+                                     c(x$estimate,
+                                       x$estimate[1]-x$estimate[2],
+                                       x$statistic,
+                                       x$parameter,
+                                       x$p.value,
+                                       x$conf.int)
+                                   )
+                                 )
+                                 colnames(tempRes) <- c("$M_{G0}$", "Mean Group 1", "MeanDiff",
+                                                        "t", "df", "p", "CI Low", "CI Up")
+                                 return(tempRes)
+                                 
+                               })
+            tTestRes <- data.table::rbindlist(tTestRes, idcol = "Variable")
+            tTestRes$Variable <- as.character(input$varY2)
+            
+            HTML(kableExtra::kable( tTestRes,
+                                    #col.names = c("Variable",
+                                     #             "$M_{G1}$", "$M_{G1}$", "$\\Delta M$",
+                                    #              "$t$", "$df$", "$p$",
+                                    #              "Lower", "Upper"),
+                                    format = "html",
+                                    digits = 3) |>
+                   kableExtra::kable_styling(full_width = TRUE))
+            
+          } else {
+            
+            tTestRes <- as.data.frame(
+              t(
+                c(calctTest()$estimate,
+                  calctTest()$estimate[1]-calctTest()$estimate[2],
+                  calctTest()$statistic,
+                  calctTest()$parameter,
+                  calctTest()$p.value,
+                  calctTest()$conf.int)
+              )
+            )
+            colnames(tTestRes) <- c("Mean Group 0", "Mean Group 1", "MeanDiff",
+                                    "t", "df", "p", "CI Low", "CI Up")
+            
+            HTML(kableExtra::kable( tTestRes,
+                                    col.names = c("$M_{G0}$", "$M_{G1}$", "$\\Delta M$",
+                                                  "$t$", "$df$", "$p$",
+                                                  "Lower", "Upper"),
+                                    format = "html",
+                                    digits = 3) |>
+                   kableExtra::kable_styling(full_width = TRUE))
+            
+          }
+    } else {
+      
+      return(NULL)
+      
+    }
+          
+      })
+    
+  
+  
+  
   # Calculate Regression ####
   calcReg <- reactive({
     
