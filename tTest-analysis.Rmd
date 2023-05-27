@@ -19,11 +19,9 @@ params$tTestOut
 
 ```
 
-
 ```{r, eval=TRUE, echo=FALSE}
 
 params$plot
-
 
 ```
 

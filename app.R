@@ -137,7 +137,7 @@ ui <- fluidPage(
                                            hr(),
                                            checkboxInput(inputId = "tTestResFormat", label = "Table?", FALSE),
                                            hr(),
-                                           checkboxInput(inputId = "boxplot", "Boxplot", FALSE),
+                                           checkboxInput(inputId = "boxplot", "Boxplot (not working)", FALSE),
                                            uiOutput("boxUi"),
                                            hr(),
                                            downloadButton("downloadtTest", "Download t-Test analysis")),
@@ -163,9 +163,6 @@ ui <- fluidPage(
                                                                    character(0),
                                                                    selected = NULL,
                                                                    multiple = FALSE))),
-                                           hr(),
-                                           checkboxInput(inputId = "scatterPlot2", "Scatterplot", FALSE),
-                                           uiOutput("smooth2"),
                                            hr(),
                                            downloadButton("downloadReg", "Download regression analysis")),
                           conditionalPanel(condition = "input.tabs == 5", # path analysis ui ####
@@ -629,7 +626,7 @@ server <- function(input, output) {
                                        x$conf.int)
                                    )
                                  )
-                                 colnames(tempRes) <- c("$M_{G0}$", "Mean Group 1", "MeanDiff",
+                                 colnames(tempRes) <- c("M G0", "M G1", "MeanDiff",
                                                         "t", "df", "p", "CI Low", "CI Up")
                                  return(tempRes)
                                  
@@ -638,10 +635,6 @@ server <- function(input, output) {
             tTestRes$Variable <- as.character(input$varY2)
             
             HTML(kableExtra::kable( tTestRes,
-                                    #col.names = c("Variable",
-                                     #             "$M_{G1}$", "$M_{G1}$", "$\\Delta M$",
-                                    #              "$t$", "$df$", "$p$",
-                                    #              "Lower", "Upper"),
                                     format = "html",
                                     digits = 3) |>
                    kableExtra::kable_styling(full_width = TRUE))
@@ -658,13 +651,10 @@ server <- function(input, output) {
                   calctTest()$conf.int)
               )
             )
-            colnames(tTestRes) <- c("Mean Group 0", "Mean Group 1", "MeanDiff",
+            colnames(tTestRes) <- c("M G0", "M G1", "MeanDiff",
                                     "t", "df", "p", "CI Low", "CI Up")
             
             HTML(kableExtra::kable( tTestRes,
-                                    col.names = c("$M_{G0}$", "$M_{G1}$", "$\\Delta M$",
-                                                  "$t$", "$df$", "$p$",
-                                                  "Lower", "Upper"),
                                     format = "html",
                                     digits = 3) |>
                    kableExtra::kable_styling(full_width = TRUE))
@@ -889,21 +879,6 @@ server <- function(input, output) {
     
     })
   
-  output$smooth2 = renderUI({
-    
-    if (input$scatterPlot2 == FALSE) {
-      return(NULL)
-      
-    } else {
-      
-      checkboxInput(inputId = "smooth2", "Loess function?", FALSE)
-      
-    }
-    
-    
-    
-  })
-  
   output$boxUi = renderUI({
     
     if (input$boxplot == FALSE) {
@@ -979,42 +954,6 @@ server <- function(input, output) {
     
   })
   
-  output$scatter2 <- renderPlot({
-    
-    if ( input$scatterPlot2 == TRUE ) {
-      
-      if ( length(as.character(input$varYreg)) == 0 | length(as.character(input$varsX)) == 0) {
-        stop("You need to select variables.")
-      }
-      
-      if ( length(input$varX2) > 1 ) {
-        stop("visualizing is only available for 2 variables in total (Y and X)")
-      }
-      
-      sc2 <- ggplot(data = dataInput(),
-             aes(y = .data[[input$varYreg]],
-                 x = .data[[as.character(input$varsX)]])) +
-        geom_point(color = "black", fill = "white", size = 3, alpha = .25) +
-        geom_smooth(method = "lm", formula = 'y ~ x', se = FALSE) + 
-        theme_minimal() + theme(axis.text = element_text(size = 20),
-                                axis.title = element_text(size = 20))
-      
-      if ( input$smooth2 == FALSE ) {
-        
-        sc2
-        
-        
-      } else {
-        
-        sc2 <- sc2 + geom_smooth(method = "loess", formula = 'y ~ x',
-                                 se = FALSE, color = "darkred")
-        sc2
-      
-    }
-      
-    }
-    
-  })
   
   boxplotReac <- reactive({
     
