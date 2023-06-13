@@ -1245,7 +1245,9 @@ server <- function(input, output) {
       # Knit the document, passing in the `params` list, and eval it in a
       # child of the global environment (this isolates the code in the document
       # from the code in this app).
-      rmarkdown::render(tempDescr, output_file = file,
+      rmarkdown::render(tempDescr, 
+                        output_file = file,
+                        output_format = "word_document",
                         params = params,
                         envir = new.env(parent = globalenv())
       )
@@ -1267,7 +1269,9 @@ server <- function(input, output) {
       # Knit the document, passing in the `params` list, and eval it in a
       # child of the global environment (this isolates the code in the document
       # from the code in this app).
-      rmarkdown::render(tempCor, output_file = file,
+      rmarkdown::render(tempCor, 
+                        output_file = file,
+                        output_format = "word_document",
                         params = params,
                         envir = new.env(parent = globalenv())
       )
@@ -1288,7 +1292,9 @@ server <- function(input, output) {
       # Knit the document, passing in the `params` list, and eval it in a
       # child of the global environment (this isolates the code in the document
       # from the code in this app).
-      rmarkdown::render(temptTest, output_file = file,
+      rmarkdown::render(temptTest, 
+                        output_file = file,
+                        output_format = "word_document",
                         params = params,
                         envir = new.env(parent = globalenv())
       )
@@ -1309,7 +1315,9 @@ server <- function(input, output) {
       # Knit the document, passing in the `params` list, and eval it in a
       # child of the global environment (this isolates the code in the document
       # from the code in this app).
-      rmarkdown::render(tempReg, output_file = file,
+      rmarkdown::render(tempReg, 
+                        output_file = file,
+                        output_format = "word_document",
                         params = params,
                         envir = new.env(parent = globalenv())
       )
