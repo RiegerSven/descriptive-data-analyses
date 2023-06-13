@@ -38,7 +38,8 @@ ui <- fluidPage(
                                                                              "Double Quote" = '"',
                                                                               "Single Quote" = "'"),
                                                                  selected = '"'))),
-                                           br(),
+                                           uiOutput("dataOpt"),
+                                           hr(),
                                            selectizeInput(inputId="exdata", label="Example Data", selected="",
                                                           choices= c("",
                                                                      "Diamonds (ggplot2 package)",
@@ -48,7 +49,32 @@ ui <- fluidPage(
                                                           options = list(placeholder = 'choose example data'),
                                                           width='50%'),
                                            hr(),
-                                           checkboxInput(inputId = "showDatInfo", "Show information about the data set: str(data)", FALSE)
+                                           fluidRow(
+                                             column(4,
+                                                    varSelectInput(inputId = "filtVar",
+                                                                   label = "Filter variable (optional)",
+                                                                   character(0),
+                                                                   selected = "no filter",
+                                                                   multiple = FALSE)),
+                                             column(4,
+                                                    selectInput(inputId = "filtOp",
+                                                                label = "Select operator",
+                                                                selected = "==",
+                                                                choices = c("==",
+                                                                            ">",
+                                                                            "<",
+                                                                            ">=",
+                                                                            "<="))
+                                                    ),
+                                             column(4,
+                                                    textInput(inputId = "filtVal", "Filter value",
+                                                              placeholder = "Enter value.",
+                                                              value = ""))
+                                             #uiOutput("filtVal")
+                                             ),
+                                           checkboxInput(inputId = "showDatInfo",
+                                                         "Show information about the data set: str(data)",
+                                                         value = TRUE)
                                            ),
                           conditionalPanel(condition = "input.tabs == 1", # descriptive ui ####
                                            varSelectInput(inputId = "vars", label = "Variables (required)",
@@ -70,8 +96,11 @@ ui <- fluidPage(
                                                     checkboxInput(inputId = "skew", "Skewness", FALSE),
                                                     checkboxInput(inputId = "kurt", "Kurtosis", FALSE))),
                                            hr(),
-                                           checkboxInput(inputId = "hist", "Density plots?", FALSE),
+                                           checkboxInput(inputId = "hist",
+                                                         "Show Histogram(s)",
+                                                         value = FALSE),
                                            uiOutput("histPlot"),
+                                           uiOutput("histUp"),
                                            hr(),
                                            downloadButton("downloadDescr", "Download descriptive statistics")),
                           conditionalPanel(condition = "input.tabs == 2", # correlation ui ####
@@ -133,12 +162,11 @@ ui <- fluidPage(
                                                                  #width = '30%'
                                                                  ))),
                                            checkboxInput(inputId = "var.equal", "Equal variances", FALSE),
-                                           checkboxInput(inputId = "paired", "Paired t-test", FALSE),
                                            hr(),
-                                           checkboxInput(inputId = "tTestResFormat", label = "Table?", FALSE),
-                                           hr(),
-                                           checkboxInput(inputId = "boxplot", "Boxplot (not working)", FALSE),
-                                           uiOutput("boxUi"),
+                                           #checkboxInput(inputId = "tTestResFormat", label = "Table?", FALSE),
+                                           #hr(),
+                                           checkboxInput(inputId = "dotplot", "Dotplot", FALSE),
+                                           uiOutput("dotUi"),
                                            hr(),
                                            downloadButton("downloadtTest", "Download t-Test analysis")),
                           conditionalPanel(condition = "input.tabs == 4", # regression ui ####
@@ -148,7 +176,7 @@ ui <- fluidPage(
                                                                    character(0),
                                                                    multiple = TRUE),
                                                     selectInput(inputId = "scaleLevel", label = "Scale level of Y:",
-                                                                choices = c("metric", "ordinal", "binary"),
+                                                                choices = c("metric", "binary"),
                                                                 selected = "metric",
                                                                 width = '100%')),
                                              column(6,
@@ -229,9 +257,9 @@ ui <- fluidPage(
                                                plotOutput(outputId = "scatter1"), style='width: 65%'),
                                       tabPanel("t-Test", value = 3,
                                                verbatimTextOutput(outputId = "tTest"),
-                                               uiOutput("tTestTab"),
+                                               #uiOutput("tTestTab"),
                                                hr(),
-                                               plotOutput(outputId = "boxplot"), style='width: 65%'),
+                                               plotOutput(outputId = "dotplot"), style='width: 65%'),
                                       tabPanel("Regression Modeling", value = 4,
                                                verbatimTextOutput(outputId = "regOutput"),
                                                hr(),
@@ -262,7 +290,7 @@ ui <- fluidPage(
 server <- function(input, output) {
   
   # Reactive Data Input ####
-  dataInput <- reactive({
+  dataInput0 <- reactive({
     
       if (is.null(input$file1$datapath)) {
         
@@ -283,23 +311,104 @@ server <- function(input, output) {
         
         
       } else {
-       
+        
+        
+        if ( !is.null(input$missVal) ) {
+          missVals <- gsub(" ", "", paste0(input$missVal), fixed = TRUE)
+          missVals <- unlist(strsplit(x = missVals, split = ";" ))
+          missVals
+        } else {
+          missVals <- NULL
+        }
         
         
         dat <- tryCatch(data.table::data.table ( read.csv(input$file1$datapath,
-                                               header = input$header,
-                                               sep = input$sep,
-                                               quote = input$quote,
-                                               dec = input$dec) 
+                                                          header = input$header,
+                                                          sep = input$sep,
+                                                          quote = input$quote,
+                                                          dec = input$dec
+                                                          ,na.strings = c(missVals)
+                                                          ) 
                                       ))
-        updateSelectInput(session = getDefaultReactiveDomain(), "exdata", choices = "You uploaded data.") 
+        
+        for (col in names(dat)) {
+          if (is.integer(dat[[col]])) {
+            dat[[col]] <- as.numeric(dat[[col]])
+          }
+        }
+        
+        
+        updateSelectInput(session = getDefaultReactiveDomain(),
+                          "exdata",
+                          choices = "You already uploaded data.") 
       
       return(dat)
       }
   })
   
   
+  dataInput <- reactive({
+    
+    if (is.null(dataInput0())) {
+      
+      dat <- dataInput0()
+      
+    } else {
+    
+    if ( input$filtVal != "" ) {
+      #eval(parse(text = paste0(input$filtOp)))
+      if ( input$filtVar == "no filter") {
+        dat <- dataInput0()
+        showNotification("Please select a filter variable first; no subsetting was done.",
+                         type = "warning")
+      } else {
+      
+      tempFiltVar <- paste0(input$filtVar)
+      
+      if ( input$filtOp == "==" ) {
+        
+        dat <- subset(dataInput0(), dataInput0()[,tempFiltVar] == input$filtVal)
+        
+      } else if (input$filtOp == ">") {
+        
+        dat <- subset(dataInput0(), dataInput0()[,tempFiltVar] > input$filtVal)
+        
+      } else if (input$filtOp == "<") {
+        
+        dat <- subset(dataInput0(), dataInput0()[,tempFiltVar] < input$filtVal)
+        
+      } else if (input$filtOp == ">=") {
+        
+        dat <- subset(dataInput0(), dataInput0()[,tempFiltVar] >= input$filtVal)
+        
+      } else if (input$filtOp == "<=") {
+        
+        dat <- subset(dataInput0(), dataInput0()[,tempFiltVar] <= input$filtVal)
+        
+      }
+      }
+
+      
+    } else {
+      
+      dat <- dataInput0()
+      
+    }
+    }
+    
+    
+    return(dat)
+      
+    
+  })
+  
+  
   # Update Select Input ####
+  
+  observeEvent(dataInput0(), {
+    updateSelectInput(session = getDefaultReactiveDomain(), "filtVar", choices = c("no filter", colnames(dataInput())),
+                      selected = "no filter")
+  })
   
   observeEvent(dataInput(), {
     updateSelectInput(session = getDefaultReactiveDomain(), "vars", choices = colnames(dataInput()))
@@ -449,9 +558,9 @@ server <- function(input, output) {
     histPlot <- function( data,
                           item,
                           title = "",
-                          xLab = "",
-                          yLab = "Density",
-                          facetNcol = 3) {
+                          xLab = input$histlabX,
+                          yLab = input$histlabY,
+                          facetNcol = 2) {
       
       #data <- data.table::as.data.table(data)
       if (length(item) > 1) {
@@ -470,16 +579,16 @@ server <- function(input, output) {
       
       tempPlot <- ggplot(data = data,
                          aes( x = val)) +
-        geom_histogram(aes(y=after_stat(density)),
+        geom_histogram(#aes(y=after_stat(density)),
                        fill = "lightgrey", color = "black", bins = 30) +
-        geom_density(aes(y=after_stat(density)), fill = "lightblue", alpha = .5) +
+        #geom_density(aes(y=after_stat(density)), fill = "lightblue", alpha = .5) +
         facet_wrap(~item, scales = "free", ncol = facetNcol) +
         labs(x = xLab, y = yLab) +
         theme_minimal() +
-        theme(axis.text = element_text(size = 15),
-              axis.title = element_text(size = 15),
+        theme(axis.text = element_text(size = input$histAxisTextSize),
+              axis.title = element_text(size = input$histAxisTextSize),
               plot.title = element_text(size = 25, hjust = 0.5),
-              strip.text.x = element_text(size = 20))
+              strip.text.x = element_text(size = input$histAxisTextSize))
       
       return(tempPlot)
       
@@ -508,11 +617,15 @@ server <- function(input, output) {
   # Calculate correlation ####
   calcCorr <- reactive({
     
-    cor.test(x = dataInput()[,as.character(input$varX)],
-             y = dataInput()[,as.character(input$varY)],
-             alternative = input$alternative,
-             method = paste0(input$method),
-             conf.level = input$conf)
+    tempFormula <- as.formula( paste("~", input$varY, "+", input$varX ) )
+    
+    cor.test(
+      tempFormula,
+      data = dataInput(),     
+      alternative = input$alternative,
+      method = paste0(input$method),
+      conf.level = input$conf
+      )
     
   })
   
@@ -552,7 +665,7 @@ server <- function(input, output) {
                                                data = dataInput(),
                                                alternative = input$alternative2,
                                                conf.level = input$conf2,
-                                               paired = input$paired,
+                                               paired = FALSE,
                                                var.equal = input$var.equal,
                                                mu = input$mu)
                            return(temptTest)
@@ -568,7 +681,7 @@ server <- function(input, output) {
            data = dataInput(),
            alternative = input$alternative2,
            conf.level = input$conf2,
-           paired = input$paired,
+           paired = FALSE,
            var.equal = input$var.equal,
            mu = input$mu)
     
@@ -577,7 +690,6 @@ server <- function(input, output) {
     
     
   })
-  
   
   output$tTest <- renderPrint({
       
@@ -606,6 +718,50 @@ server <- function(input, output) {
         }
         }
     }) 
+  
+  tTestRes <- reactive({
+    
+    if ( length(input$varY2) > 1 ) {
+            
+            tTestRes <- lapply(calctTest(),
+                               function(x) {
+                                 
+                                 tempRes <- as.data.frame(
+                                   t(
+                                     c(x$estimate,
+                                       x$estimate[1]-x$estimate[2],
+                                       x$statistic,
+                                       x$parameter,
+                                       x$p.value,
+                                       x$conf.int)
+                                   )
+                                 )
+                                 colnames(tempRes) <- c("M G0", "M G1", "MeanDiff",
+                                                        "t", "df", "p", "CILow", "CIUp")
+                                 return(tempRes)
+                                 
+                               })
+            tTestRes <- data.table::rbindlist(tTestRes, idcol = "Variable")
+            tTestRes$Variable <- as.character(input$varY2)
+            tTestRes
+          } else {
+            
+            tTestRes <- as.data.frame(
+              t(
+                c(calctTest()$estimate,
+                  calctTest()$estimate[1]-calctTest()$estimate[2],
+                  calctTest()$statistic,
+                  calctTest()$parameter,
+                  calctTest()$p.value,
+                  calctTest()$conf.int)
+              )
+            )
+            colnames(tTestRes) <- c("M G0", "M G1", "MeanDiff",
+                                    "t", "df", "p", "CILow", "CIUp")
+            tTestRes$Variable <- as.character(input$varY2)
+            tTestRes
+           }
+      })
   
   output$tTestTab <- renderUI({
     
@@ -667,9 +823,42 @@ server <- function(input, output) {
     }
           
       })
+  
+  dotplotReac <- reactive({
     
+    if ( input$dotplot == TRUE ) {
+      
+      if ( length(as.character(input$varY2)) == 0 | length(as.character(input$varX2)) == 0) {
+        stop("You need to select variables.")
+      }
+      
+      tempPlot <- ggplot(data = tTestRes(),
+              aes(y = MeanDiff, x = Variable)) +
+        geom_point(color = "black", size = 3) +
+        geom_errorbar(aes(ymin = CILow, ymax = CIUp), width = .1) +
+        scale_y_continuous(expand = c(0, 0)) +
+        geom_hline(yintercept = input$mu, linetype = "dashed", color = "darkred") +
+        labs(x = input$dotlabX, y = input$dotlabY, title = input$dottitle) +
+        facet_wrap(~Variable, scales = "free") +
+        theme_minimal() + theme(axis.text.x = element_blank(),
+                                axis.ticks.x = element_blank(),
+                                strip.text.x = element_text(size = input$dotAxisTextSize),
+                                axis.title = element_text(size = input$dotAxisTextSize),
+                                axis.text.y = element_text(size = input$dotAxisTextSize),
+                                plot.title = element_text(size = input$dotTitleTextSize, hjust = 0.5))
+        theme_classic()
+        
+      tempPlot
+      
+    } 
+    
+  })
   
-  
+  output$dotplot <- renderPlot({
+    
+    dotplotReac()
+    
+  })
   
   # Calculate Regression ####
   calcReg <- reactive({
@@ -727,18 +916,55 @@ server <- function(input, output) {
       
     } else if ( input$scaleLevel == "binary") {
       
+      if (length(as.character(input$varYreg)) > 1 ) {
+        
+        modelRes <- lapply(1:length(as.character(input$varYreg)),
+                           function(x) {
+                             tempFormula <- as.formula( paste(as.character(input$varYreg)[x], "~", paste(input$varsX, collapse = "+") ) )
+                             
+                             tempMod <- survey::svyglm(formula = tempFormula, design = svyDesign,
+                                                       family=stats::binomial(link = "logit"))
+                             return(tempMod)
+                             
+                           })
+        
+        modelRes
+        
+      } else {
+      
       myFormula <- as.formula( paste(input$varYreg, "~", paste(input$varsX, collapse = "+") ) )
-      summary(
-        survey::svyglm(formula = myFormula, design = svyDesign,
-                       family=stats::binomial(link = "logit"))
-      )
+      
+      modelRes <- survey::svyglm(formula = myFormula, design = svyDesign,
+                                 family=stats::binomial(link = "logit"))
+      modelRes
+      
+      }
       
     } else if ( input$scaleLevel == "ordinal") {
       
+      # does not work properly... restrict selection above
+      
+      if (length(as.character(input$varYreg)) > 1 ) {
+        
+        modelRes <- lapply(1:length(as.character(input$varYreg)),
+                           function(x) {
+                             
+                             tempFormula <- as.formula( paste("as.factor(",input$varYreg,")"[x], "~", paste(input$varsX, collapse = "+") ) )
+                             tempMod <- survey::svyolr(formula = tempFormula, design = svyDesign)
+                             return(tempMod)
+                             
+                           })
+        
+        modelRes
+        
+      } else {
+      
       myFormula <- as.formula( paste("as.factor(",input$varYreg,")", "~", paste(input$varsX, collapse = "+") ) )
-      summary(
-        survey::svyolr(formula = myFormula, design = svyDesign)
-      )
+      
+      modelRes <- survey::svyolr(formula = myFormula, design = svyDesign)
+      modelRes
+      
+      }
       
     }
     
@@ -840,6 +1066,53 @@ server <- function(input, output) {
   })
   
   # UI Stuff ####
+
+  output$dataOpt <- renderUI({
+    
+    if ( !is.null( input$file1$datapath ) ) {
+    
+    dataMis <- textInput("missVal", "Missing values",
+                         placeholder = "Enter missing values separated by a semicolon.",
+                         width = '60%')
+    
+    dataOptUi <- list(dataMis)
+    dataOptUi
+    } else {
+      
+      dataOptUi <- list()
+    }
+      
+    
+  })
+
+  output$histUp = renderUI({
+    
+    if (input$hist == FALSE) {
+      return(NULL)
+      
+    } else {
+      
+      histLabX <- textInput(inputId = "histlabX", "Label of x-Axis:", value = "Values", width = '100%', placeholder = NULL)
+      histLabY <- textInput(inputId = "histlabY", "Label of y-Axis:", value = "Count", width = '100%', placeholder = NULL)
+      
+      histtextSize <- numericInput(inputId = "histAxisTextSize", label =  "Axis text size:",
+                                   value = 20, step = 1, min = 1, max = 35, width = '100%')
+      
+      histUi <- list(h4("Cosmetics"),
+                     fluidRow(
+                      column(8,
+                             histLabX,
+                             histLabY),
+                      column(4,
+                             histtextSize))
+      )
+      histUi
+    }
+    
+    
+    
+  })
+  
   
   output$smooth1 = renderUI({
     
@@ -879,35 +1152,35 @@ server <- function(input, output) {
     
     })
   
-  output$boxUi = renderUI({
+  output$dotUi = renderUI({
     
-    if (input$boxplot == FALSE) {
+    if (input$dotplot == FALSE) {
       return(NULL)
       
     } else {
       
-      boxLabX <- textInput(inputId = "boxlabX", "Label of x-Axis:", value = input$varX2, width = '100%', placeholder = NULL)
-      boxLabY <- textInput(inputId = "boxlabY", "Label of y-Axis:", value = input$varY2, width = '100%', placeholder = NULL)
-      boxtitle <- textInput(inputId = "boxtitle", "Title of plot:", value = "", width = '100%', placeholder = NULL)
-      boxtextSize <- numericInput(inputId = "boxAxisTextSize", label =  "Axis text size:",
+      dotLabX <- textInput(inputId = "dotlabX", "Label of x-Axis:", value = "", width = '100%', placeholder = "Optional description of the x-axis.")
+      dotLabY <- textInput(inputId = "dotlabY", "Label of y-Axis:", value = "Mean difference", width = '100%', placeholder = NULL)
+      dottitle <- textInput(inputId = "dottitle", "Title of plot:", value = "", width = '100%', placeholder = NULL)
+      dottextSize <- numericInput(inputId = "dotAxisTextSize", label =  "Axis text size:",
                                   value = 20, step = 1, min = 1, max = 35, width = '100%')
-      boxTitleTextSize <- numericInput(inputId = "boxTitleTextSize", label =  "Title text size:",
+      dotTitleTextSize <- numericInput(inputId = "dotTitleTextSize", label =  "Title text size:",
                                        value = 25, step = 1, min = 1, max = 35, width = '100%')
-      boxUi <- list(h4("Cosmetics"),
+      dotUi <- list(h4("Cosmetics"),
                     fluidRow(
                       column(8,
-                             boxLabX,
-                             boxLabY),
+                             dotLabX,
+                             dotLabY),
                       column(4,
-                             boxtextSize)),
+                             dottextSize)),
                     fluidRow(
                       column(8,
-                             boxtitle),
+                             dottitle),
                       column(4,
-                             boxTitleTextSize)
+                             dotTitleTextSize)
                     )
       )
-      boxUi
+      dotUi
     }
     
     
@@ -955,33 +1228,7 @@ server <- function(input, output) {
   })
   
   
-  boxplotReac <- reactive({
-    
-    if ( input$boxplot == TRUE ) {
-      
-      if ( length(as.character(input$varY2)) == 0 | length(as.character(input$varX2)) == 0) {
-        stop("You need to select variables.")
-      }
-      
-      tempBox <- ggplot(data = dataInput(),
-                        aes(y = .data[[input$varY2]],
-                            x = factor(.data[[input$varX2]]))) +
-        geom_boxplot(color = "black", width = .3, outlier.colour="red") +
-        #geom_jitter(color = "lightgrey", alpha = .25, shape=16, position=position_jitter(0.1)) +
-        stat_summary(fun=mean, geom="point", shape=4, color ="black", size = 4) +
-        labs(x = input$boxlabX, y = input$boxlabY, title = input$boxtitle) +
-        theme_minimal() + theme(axis.text = element_text(size = 20),
-                                axis.title = element_text(size = 20))
-      tempBox
-    } 
-    
-  })
   
-  output$boxplot <- renderPlot({
-      
-    boxplotReac()
-    
-  })
   
   # Download buttos ####
   
@@ -1036,7 +1283,7 @@ server <- function(input, output) {
       
       # Set up parameters to pass to Rmd document
       params <- list(tTestOut = calctTest(),
-                     plot = boxplotReac())
+                     plot = dotplotReac())
       
       # Knit the document, passing in the `params` list, and eval it in a
       # child of the global environment (this isolates the code in the document
@@ -1073,25 +1320,30 @@ server <- function(input, output) {
   
   output$tbl = DT::renderDataTable({
     
-    DT::datatable(dataInput(), options = list(lengthChange = FALSE))
-      
+    # https://stackoverflow.com/questions/58526047/customizing-how-datatables-displays-missing-values-in-shiny
+    rowCallback <- c(
+      "function(row, data){",
+      "  for(var i=0; i<data.length; i++){",
+      "    if(data[i] === null){",
+      "      $('td:eq('+i+')', row).html('NA')",
+      "        .css({'color': 'rgb(237, 12, 12)', 'font-style': 'italic'});",
+      "    }",
+      "  }",
+      "}"  
+    )
+    
+    DT::datatable(dataInput(),
+                  options = list(lengthChange = FALSE,
+                                 rowCallback = DT::JS(rowCallback)),
+                  editable = FALSE)
+
   })
   
   output$showDatInfo = renderPrint({
     
-    if (input$showDatInfo == TRUE) {
-      
-      if ( is.null(dataInput())) {
-        HTML("Please upload data or select an example data set.")
-      } else {
-        
-        str(dataInput())
-        
-      }
-      
-      
-    }
-    
+    if ( !is.null(dataInput()) & input$showDatInfo == TRUE) {
+      str(dataInput())
+    } 
     
   })
   
