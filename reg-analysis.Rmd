@@ -20,7 +20,7 @@ dat <- params$data
 
 regRes <- params$regOut
 
-jtools::export_summs(regRes)
+jtools::export_summs(regRes)#, to.file = "docx")
 
 
 ```
