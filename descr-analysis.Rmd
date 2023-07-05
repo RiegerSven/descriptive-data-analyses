@@ -15,18 +15,41 @@ library(ggplot2)
 
 
 ```{r, eval=TRUE, echo=FALSE, warning=FALSE}
-knitr::kable(params$descrOut,
+
+if (!is.null(params$descrOut)) {
+  knitr::kable(params$descrOut,
              caption = "Descriptive Statistics of continious variables",
              format = "pipe")
+  
+} else {
+  cat("No continious variables requested.")
+}
+
+
 ```
 
 
 ```{r, eval=TRUE, echo=FALSE, warning=FALSE}
-params$hist
+
+if (!is.null(params$hist)) {
+  params$hist
+} else {
+    cat("No Histogram(s) requested.")
+  
+  }
+
 ```
 
 ```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+
+if (!is.null(params$descrCatOut)) {
+  
 knitr::kable(params$descrCatOut,
              caption = "Frequencies of categorical variables",
              format = "pipe")
+} else {
+    cat("No categorical variables requested.")
+  
+  }
+
 ```

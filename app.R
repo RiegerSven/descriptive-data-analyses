@@ -496,6 +496,8 @@ server <- function(input, output) {
     }
     myVars <- as.character(input$vars)
     
+    if ( length(myVars) > 0 ) {
+    
     tempDescr <- data.table::rbindlist(
       lapply( 1:length(myVars),
               function(x) {
@@ -537,6 +539,9 @@ server <- function(input, output) {
                                                       input$kurt)]
     
     tempDescr[,..selDescr]
+    } else {
+      return(NULL)
+    }
     
   
     
@@ -639,10 +644,13 @@ server <- function(input, output) {
       }
       
     }
-    
+    if ( length(as.character(input$catVars)) > 0 ) {
     catVar(variable = as.character(input$catVars),
            data = dataInput(),
-           table = FALSE)
+           table = FALSE) } 
+    else {
+      return(NULL)
+    }
     
     
   })
