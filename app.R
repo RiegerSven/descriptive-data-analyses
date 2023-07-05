@@ -77,10 +77,9 @@ ui <- fluidPage(
                                                          value = TRUE)
                                            ),
                           conditionalPanel(condition = "input.tabs == 1", # descriptive ui ####
-                                           varSelectInput(inputId = "vars", label = "Variables (required)",
+                                           varSelectInput(inputId = "vars", label = "Continuous Variables",
                                                           character(0),
                                                           multiple = TRUE),
-                                           hr(),
                                            h4("Which statistics?"),
                                            fluidRow(
                                              column(4, HTML("<b>Measures of <br> central tendency</b>"),
@@ -101,6 +100,10 @@ ui <- fluidPage(
                                                          value = FALSE),
                                            uiOutput("histPlot"),
                                            uiOutput("histUp"),
+                                           hr(),
+                                           varSelectInput(inputId = "catVars", label = "Categorical Variables",
+                                                          character(0),
+                                                          multiple = TRUE),
                                            hr(),
                                            downloadButton("downloadDescr", "Download descriptive statistics")),
                           conditionalPanel(condition = "input.tabs == 2", # correlation ui ####
@@ -248,7 +251,10 @@ ui <- fluidPage(
                                       tabPanel("Descriptive statistics", value = 1,
                                                verbatimTextOutput(outputId = "descr"),
                                                hr(),
-                                               plotOutput(outputId = "hist"), style='width: 75%'),
+                                               plotOutput(outputId = "hist"),
+                                               hr(),
+                                               verbatimTextOutput(outputId = "descrCat"),
+                                               style='width: 75%'),
                                       tabPanel("Correlation", value = 2,
                                                #withMathJax("$$\\text{Display formula in heading }...$$"),
                                                #hr(),
@@ -415,6 +421,10 @@ server <- function(input, output) {
   })
   
   observeEvent(dataInput(), {
+    updateSelectInput(session = getDefaultReactiveDomain(), "catVars", choices = colnames(dataInput()))
+  })
+  
+  observeEvent(dataInput(), {
     updateSelectInput(session = getDefaultReactiveDomain(), "varY", choices = c("", colnames(dataInput())),
                       selected = "")
   })
@@ -532,6 +542,111 @@ server <- function(input, output) {
     
   })
   
+  calcDescrCat <- reactive({
+    
+    catVar <- function ( variable,
+                         data,
+                         table = TRUE) {
+      
+      
+      # calculate freq. as function
+      calcFreq <- function ( variable, data) {
+        
+        # calc abs and rel freq.
+        tempFreq <- data.frame( abs = table(data[,variable],
+                                            useNA = "always"))
+        
+        tempFreq$rel <- table(data[,variable],
+                              useNA = "always")/length(data[,variable])*100
+        
+        colnames(tempFreq) <- c("var",
+                                "Absolute",
+                                "Relative")
+        
+        # calculate sum
+        tempFreq <- rbind(tempFreq,
+                          data.frame(var = "Sum",
+                                     t(colSums(tempFreq[!is.na(tempFreq$var),-1])))
+        )
+        
+        
+        # cosmetics
+        
+        tempFreq$Relative <- paste0(
+          sprintf(tempFreq$Relative,
+                  fmt = '%#.1f'),
+          "%")
+        
+        tempTab <- as.data.frame(t(tempFreq[,-1]))
+        colnames(tempTab) <- tempFreq[,1]
+        colnames(tempTab)[is.na(colnames(tempTab))] <- "Miss"
+        
+        tempTab <- as.data.frame(
+          t(sapply(colnames(tempTab),
+                   function(x) paste0(tempTab[1,x],
+                                      " (",
+                                      tempTab[2,x], ")"),
+                   simplify = TRUE)
+          )
+        )
+        
+        return(tempTab)
+      }
+      
+      tempFreq <- data.table::rbindlist(
+        sapply(variable,
+               function(x) 
+                 calcFreq(variable = x, data = data),
+               simplify = FALSE),
+        idcol = "Variable", use.names = T, fill = T)
+      
+      # get colnames to sort
+      colToSort <- c("Variable", colnames(tempFreq)[!colnames(tempFreq) %in% 
+                                                      c("Variable",
+                                                        "Miss",
+                                                        "Sum"
+                                                        #"Sum (miss)"
+                                                      )],
+                     "Sum",
+                     "Miss"
+                     #"Sum (miss)",
+      )
+      
+      tempFreq <- tempFreq[,..colToSort]
+      
+      
+      if ( table == TRUE ) {
+        
+        tempTab <- kableExtra::kbl(
+          x = tempFreq,
+          align = "c"
+        ) |>
+          kableExtra::kable_styling(
+            full_width = TRUE,
+            bootstrap_options = c("hover", "responsive")
+            #,latex_options = "HOLD_position"
+          ) 
+        
+        tempOut <- tempTab
+        tempOut
+        
+      } else {
+        
+        tempOut <- tempFreq[,..colToSort]
+        
+        return(tempOut)
+        
+      }
+      
+    }
+    
+    catVar(variable = as.character(input$catVars),
+           data = dataInput(),
+           table = FALSE)
+    
+    
+  })
+  
   output$descr <- renderPrint({
     
     if ( is.null(dataInput())) {
@@ -542,13 +657,34 @@ server <- function(input, output) {
     
     if ( length(as.character(input$vars)) == 0 ) {
       
-      HTML( "Please select variables") 
+      HTML( "Please select continuous variables") 
       
     } else {
         
     calcDescr()
      
     }
+    }
+    
+  })
+  
+  output$descrCat <- renderPrint({
+    
+    if ( is.null(dataInput())) {
+      
+      HTML( "") 
+      
+    } else {
+      
+      if ( length(as.character(input$catVars)) == 0 ) {
+        
+        HTML( "Please select categorical variables") 
+        
+      } else {
+        
+        calcDescrCat()
+        
+      }
     }
     
   })
@@ -1240,7 +1376,8 @@ server <- function(input, output) {
       
       # Set up parameters to pass to Rmd document
       params <- list(descrOut = calcDescr(),
-                     hist = hist())
+                     hist = hist(),
+                     descrCatOut = calcDescrCat())
       
       # Knit the document, passing in the `params` list, and eval it in a
       # child of the global environment (this isolates the code in the document

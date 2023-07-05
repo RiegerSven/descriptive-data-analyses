@@ -5,6 +5,7 @@ output: word_document
 params:
   descrOut: NA
   hist: NA
+  descrCatOut: NA
 ---
 
 
@@ -15,7 +16,7 @@ library(ggplot2)
 
 ```{r, eval=TRUE, echo=FALSE, warning=FALSE}
 knitr::kable(params$descrOut,
-             caption = "Descriptive Statistics",
+             caption = "Descriptive Statistics of continious variables",
              format = "pipe")
 ```
 
@@ -24,3 +25,8 @@ knitr::kable(params$descrOut,
 params$hist
 ```
 
+```{r, eval=TRUE, echo=FALSE, warning=FALSE}
+knitr::kable(params$descrCatOut,
+             caption = "Frequencies of categorical variables",
+             format = "pipe")
+```
