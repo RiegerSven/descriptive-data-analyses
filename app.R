@@ -557,6 +557,8 @@ server <- function(input, output) {
       # calculate freq. as function
       calcFreq <- function ( variable, data) {
         
+        data <- as.data.frame(data) # quick fix, hopefully it works
+        
         # calc abs and rel freq.
         tempFreq <- data.frame( abs = table(data[,variable],
                                             useNA = "always"))
@@ -644,12 +646,16 @@ server <- function(input, output) {
       }
       
     }
+    
     if ( length(as.character(input$catVars)) > 0 ) {
-    catVar(variable = as.character(input$catVars),
+    
+      catVar(variable = as.character(input$catVars),
            data = dataInput(),
-           table = FALSE) } 
-    else {
+           table = FALSE) 
+      } else {
+        
       return(NULL)
+        
     }
     
     
