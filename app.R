@@ -815,7 +815,7 @@ server <- function(input, output) {
                                                data = dataInput(),
                                                alternative = input$alternative2,
                                                conf.level = input$conf2,
-                                               paired = FALSE,
+                                               #paired = FALSE,
                                                var.equal = input$var.equal,
                                                mu = input$mu)
                            return(temptTest)
@@ -831,7 +831,7 @@ server <- function(input, output) {
            data = dataInput(),
            alternative = input$alternative2,
            conf.level = input$conf2,
-           paired = FALSE,
+           #paired = FALSE,
            var.equal = input$var.equal,
            mu = input$mu)
     
